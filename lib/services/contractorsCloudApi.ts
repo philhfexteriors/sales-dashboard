@@ -134,14 +134,20 @@ class ContractorsCloudClient {
    * Upload a file (PDF, CSV, etc.) to a project.
    * Uses POST /projects/{id}/files with multipart/form-data.
    *
+   * CC file organization has two levels:
+   *   - file_type_id: broad category (1=Documents, 6=Photos, 10=Forms)
+   *   - file_description_id: specific label within category (e.g., 6172="Signed Production Plan")
+   *
    * @param projectId - The CC project ID
    * @param fileBuffer - The file content as a Buffer
    * @param fileName - The display filename (e.g., "H&F Exteriors Production Plan - Smith - 01/15/2026.pdf")
-   * @param options.fileTypeId - The folder ID in CC (e.g., "Contract" folder)
+   * @param options.fileTypeId - The broad file category ID (1 for documents/contracts)
+   * @param options.fileDescriptionId - The specific file description/label ID (e.g., 6172 for "Signed Production Plan")
    * @param options.isVisibleOnCustomerPortal - Whether the file shows on the customer portal
    */
   async uploadProjectFile(projectId: number, fileBuffer: Buffer, fileName: string, options?: {
     fileTypeId?: number
+    fileDescriptionId?: number
     isSensitive?: boolean
     isVisibleOnCustomerPortal?: boolean
   }): Promise<CCProjectFile> {
@@ -155,6 +161,9 @@ class ContractorsCloudClient {
 
     if (options?.fileTypeId) {
       formData.append('file_type_id', options.fileTypeId.toString())
+    }
+    if (options?.fileDescriptionId) {
+      formData.append('file_description_id', options.fileDescriptionId.toString())
     }
     if (options?.isSensitive !== undefined) {
       formData.append('is_sensitive', options.isSensitive ? '1' : '0')

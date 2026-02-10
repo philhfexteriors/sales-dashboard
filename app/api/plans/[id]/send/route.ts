@@ -83,16 +83,21 @@ export async function POST(
         const projects = await ccClient.getProjectsByAccount(plan.cc_account_id)
         if (projects.length > 0) {
           const projectId = projects[0].id
-          const fileTypeId = process.env.CC_CONTRACT_FILE_TYPE_ID
-            ? parseInt(process.env.CC_CONTRACT_FILE_TYPE_ID)
-            : undefined
+          // CC file organization: file_type_id=1 (Documents), file_description_id=6172 ("Signed Production Plan")
+          const fileTypeId = process.env.CC_FILE_TYPE_ID
+            ? parseInt(process.env.CC_FILE_TYPE_ID)
+            : 1  // Default: Documents category
+          const fileDescriptionId = process.env.CC_FILE_DESCRIPTION_ID
+            ? parseInt(process.env.CC_FILE_DESCRIPTION_ID)
+            : undefined  // "Signed Production Plan" label
 
           await ccClient.uploadProjectFile(
             projectId,
             Buffer.from(pdfBuffer),
             pdfFileName,
             {
-              fileTypeId,  // "Contract" folder ID — set via CC_CONTRACT_FILE_TYPE_ID env var
+              fileTypeId,
+              fileDescriptionId,
               isVisibleOnCustomerPortal: false,
             }
           )

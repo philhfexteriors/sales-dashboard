@@ -102,7 +102,9 @@ class ContractorsCloudClient {
     }
 
     if (query.trim()) {
-      params['filter[name]'] = query.trim()
+      // filter[search] searches across name, first/last name, AND address fields
+      // Unlike filter[name] which only matches single terms
+      params['filter[search]'] = query.trim()
     }
 
     const response = await this.request<CCPaginatedResponse<CCAccount>>('/accounts', params)

@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { isAdmin } from '@/lib/auth/roles'
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
@@ -37,12 +38,16 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/login?error=unauthorized`)
       }
 
-      // Upsert user profile (create if first login)
+      // Determine role based on admin email list
+      const role = isAdmin(email) ? 'admin' : 'salesperson'
+
+      // Upsert user profile (create if first login, update role for admins)
       await supabase.from('user_profiles').upsert({
         id: user.id,
         email: user.email,
         display_name: user.user_metadata?.full_name || user.email?.split('@')[0],
-      }, { onConflict: 'id', ignoreDuplicates: true })
+        role,
+      }, { onConflict: 'id' })
 
       return NextResponse.redirect(`${origin}/dashboard`)
     }

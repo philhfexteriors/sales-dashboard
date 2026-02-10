@@ -53,41 +53,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    let didFinish = false
-
-    // Safety timeout — never hang longer than 8 seconds
-    const timeout = setTimeout(() => {
-      if (!didFinish) {
-        console.warn('AuthProvider: safety timeout reached, forcing loading=false')
-        setLoading(false)
-        didFinish = true
-      }
-    }, 8000)
-
-    const getUser = async () => {
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError) console.warn('Session error:', sessionError.message)
-        const currentUser = session?.user ?? null
-        setUser(currentUser)
-
-        if (currentUser) {
-          await fetchProfile(currentUser.id)
-        }
-      } catch (err) {
-        console.warn('Auth init error:', err)
-      }
-      if (!didFinish) {
-        setLoading(false)
-        didFinish = true
-      }
-      clearTimeout(timeout)
-    }
-
-    getUser()
-
+    // Use onAuthStateChange as primary — it fires INITIAL_SESSION immediately
+    // and is more reliable than getSession() which can hang on token refresh
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         const currentUser = session?.user ?? null
         setUser(currentUser)
 
@@ -97,16 +66,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile(null)
         }
 
-        if (_event === 'SIGNED_OUT') {
+        setLoading(false)
+
+        if (event === 'SIGNED_OUT') {
           router.push('/login')
         }
       }
     )
 
-    return () => {
-      subscription.unsubscribe()
-      clearTimeout(timeout)
-    }
+    return () => subscription.unsubscribe()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

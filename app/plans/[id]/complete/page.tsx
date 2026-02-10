@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useState } from 'react'
+import { use, useState, useEffect } from 'react'
 import AppShell from '@/components/AppShell'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -10,6 +10,19 @@ export default function CompletePlan({ params }: { params: Promise<{ id: string 
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [hasCcAccount, setHasCcAccount] = useState(false)
+  const [ccUploadStatus, setCcUploadStatus] = useState<'none' | 'success' | 'failed'>('none')
+  const [ccError, setCcError] = useState<string | null>(null)
+
+  // Fetch plan to check if CC account is linked
+  useEffect(() => {
+    fetch(`/api/plans/${id}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.cc_account_id) setHasCcAccount(true)
+      })
+      .catch(() => {})
+  }, [id])
 
   async function handleSendEmail() {
     setSending(true)
@@ -21,8 +34,11 @@ export default function CompletePlan({ params }: { params: Promise<{ id: string 
         // Show CC upload result
         if (data.cc_upload) {
           if (data.cc_upload.success) {
+            setCcUploadStatus('success')
             toast.success('Email sent & uploaded to Contractors Cloud!')
           } else {
+            setCcUploadStatus('failed')
+            setCcError(data.cc_upload.error || 'Unknown error')
             toast.success('Email sent!')
             toast.error(`CC upload failed: ${data.cc_upload.error || 'Unknown error'}`)
           }
@@ -64,6 +80,17 @@ export default function CompletePlan({ params }: { params: Promise<{ id: string 
     setGenerating(false)
   }
 
+  function sendButtonLabel() {
+    if (sent) {
+      if (ccUploadStatus === 'success') return 'Sent & Uploaded to CC!'
+      if (ccUploadStatus === 'failed') return 'Email Sent (CC Upload Failed)'
+      return 'Email Sent!'
+    }
+    if (sending) return 'Sending...'
+    if (hasCcAccount) return 'Send PDF & Upload to Contractors Cloud'
+    return 'Send PDF to Client & Salesperson'
+  }
+
   return (
     <AppShell>
       <div className="p-6 max-w-2xl mx-auto text-center py-16">
@@ -85,8 +112,26 @@ export default function CompletePlan({ params }: { params: Promise<{ id: string 
             disabled={sending || sent}
             className="w-full py-3 rounded-lg font-semibold bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {sent ? 'Email Sent!' : sending ? 'Sending...' : 'Send PDF to Client & Salesperson'}
+            {sendButtonLabel()}
           </button>
+
+          {/* CC upload status details */}
+          {ccUploadStatus === 'success' && (
+            <p className="text-sm text-green-600 flex items-center justify-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              PDF uploaded to Contractors Cloud project files
+            </p>
+          )}
+          {ccUploadStatus === 'failed' && (
+            <p className="text-sm text-red-600 flex items-center justify-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
+              </svg>
+              CC upload failed: {ccError}
+            </p>
+          )}
 
           <button
             onClick={handleDownloadPDF}

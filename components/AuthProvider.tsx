@@ -33,16 +33,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
 
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
-      .from('user_profiles')
-      .select('role, display_name')
-      .eq('id', userId)
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('role, display_name')
+        .eq('id', userId)
+        .single()
 
-    if (data) {
-      setProfile({ role: data.role as UserRole, display_name: data.display_name })
-    } else {
-      // Default profile for new users
+      if (data && !error) {
+        setProfile({ role: data.role as UserRole, display_name: data.display_name })
+      } else {
+        console.warn('Profile fetch failed, using defaults:', error?.message)
+        setProfile({ role: 'salesperson', display_name: null })
+      }
+    } catch (err) {
+      console.warn('Profile fetch error:', err)
       setProfile({ role: 'salesperson', display_name: null })
     }
   }

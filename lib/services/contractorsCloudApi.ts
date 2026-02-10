@@ -28,6 +28,7 @@ export interface CCAccount {
 export interface CCProject {
   id: number
   account_id: number
+  number: string | null  // "Lead" before sale, 6-digit job number (e.g., "223514") after
   name: string | null
   created_at: string
   updated_at: string
@@ -130,6 +131,36 @@ class ContractorsCloudClient {
       'sort': '-created_at',
     })
     return response.data || []
+  }
+
+  /**
+   * Search projects by job number (the 6-digit number like 222xxx/223xxx).
+   * Uses filter[search] then filters client-side for exact match on number field.
+   * Returns matching projects with their account data.
+   */
+  async searchProjectsByNumber(jobNumber: string): Promise<(CCProject & { account?: CCAccount })[]> {
+    const response = await this.request<CCPaginatedResponse<CCProject>>('/projects', {
+      'filter[search]': jobNumber,
+      'page[size]': '20',
+      'page[number]': '1',
+      'sort': '-created_at',
+    })
+
+    // filter[search] is fuzzy — filter client-side for exact number match
+    const exactMatches = (response.data || []).filter(p => p.number === jobNumber)
+
+    // Fetch account details for each match
+    const results: (CCProject & { account?: CCAccount })[] = []
+    for (const project of exactMatches) {
+      try {
+        const account = await this.getAccount(project.account_id)
+        results.push({ ...project, account })
+      } catch {
+        results.push(project)
+      }
+    }
+
+    return results
   }
 
   /**

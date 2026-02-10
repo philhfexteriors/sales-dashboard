@@ -12,6 +12,7 @@ interface StartDateWindow {
 interface CCResult {
   id: number
   name: string
+  jobNumber?: string
   address: string
   city: string
   state: string
@@ -108,7 +109,7 @@ export default function ClientInfoStep() {
             value={plan.client_name}
             onChange={e => handleCcSearch(e.target.value)}
             onFocus={() => { if (ccResults.length > 0) setShowCcDropdown(true) }}
-            placeholder="Search Contractors Cloud or type name..."
+            placeholder="Search by name, address, or job number..."
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
           {ccLoading && (
@@ -128,7 +129,14 @@ export default function ClientInfoStep() {
                 onClick={() => selectCcAccount(account)}
                 className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0"
               >
-                <p className="font-medium text-gray-900 text-sm">{account.name}</p>
+                <p className="font-medium text-gray-900 text-sm">
+                  {account.name}
+                  {account.jobNumber && (
+                    <span className="ml-2 text-xs font-normal text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                      #{account.jobNumber}
+                    </span>
+                  )}
+                </p>
                 <p className="text-xs text-gray-500">
                   {[account.address, account.city, account.state].filter(Boolean).join(', ')}
                   {account.phone ? ` · ${account.phone}` : ''}

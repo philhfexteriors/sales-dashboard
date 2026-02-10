@@ -41,13 +41,17 @@ export async function GET(request: Request) {
       // Determine role based on admin email list
       const role = isAdmin(email) ? 'admin' : 'salesperson'
 
-      // Upsert user profile (create if first login, update role for admins)
-      await supabase.from('user_profiles').upsert({
-        id: user.id,
-        email: user.email,
-        display_name: user.user_metadata?.full_name || user.email?.split('@')[0],
-        role,
-      }, { onConflict: 'id' })
+      // Try to create profile on first login (non-blocking — don't break auth flow)
+      try {
+        await supabase.from('user_profiles').upsert({
+          id: user.id,
+          email: user.email,
+          display_name: user.user_metadata?.full_name || user.email?.split('@')[0],
+          role,
+        }, { onConflict: 'id', ignoreDuplicates: true })
+      } catch (profileErr) {
+        console.warn('Profile upsert failed (non-fatal):', profileErr)
+      }
 
       return NextResponse.redirect(`${origin}/dashboard`)
     }

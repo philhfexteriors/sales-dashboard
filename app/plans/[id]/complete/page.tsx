@@ -15,11 +15,21 @@ export default function CompletePlan({ params }: { params: Promise<{ id: string 
     setSending(true)
     try {
       const res = await fetch(`/api/plans/${id}/send`, { method: 'POST' })
+      const data = await res.json()
       if (res.ok) {
-        toast.success('Email sent to client and salesperson!')
         setSent(true)
+        // Show CC upload result
+        if (data.cc_upload) {
+          if (data.cc_upload.success) {
+            toast.success('Email sent & uploaded to Contractors Cloud!')
+          } else {
+            toast.success('Email sent!')
+            toast.error(`CC upload failed: ${data.cc_upload.error || 'Unknown error'}`)
+          }
+        } else {
+          toast.success('Email sent to client and salesperson!')
+        }
       } else {
-        const data = await res.json()
         toast.error(data.error || 'Failed to send email')
       }
     } catch {
@@ -34,10 +44,14 @@ export default function CompletePlan({ params }: { params: Promise<{ id: string 
       const res = await fetch(`/api/plans/${id}/pdf`)
       if (res.ok) {
         const blob = await res.blob()
+        // Extract filename from Content-Disposition header, fallback to generic
+        const cd = res.headers.get('Content-Disposition') || ''
+        const filenameMatch = cd.match(/filename="?([^";\n]+)"?/)
+        const filename = filenameMatch ? filenameMatch[1] : 'H&F Exteriors Production Plan.pdf'
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `HF_Production_Plan.pdf`
+        a.download = filename
         a.click()
         URL.revokeObjectURL(url)
         toast.success('PDF downloaded!')

@@ -26,12 +26,13 @@ interface PlanSummary {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [plans, setPlans] = useState<PlanSummary[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!user) return
+    if (authLoading) return
+    if (!user) { setLoading(false); return }
 
     async function fetchPlans() {
       try {
@@ -51,7 +52,7 @@ export default function Dashboard() {
     }
 
     fetchPlans()
-  }, [user])
+  }, [user, authLoading])
 
   const drafts = plans.filter(p => p.status === 'draft')
   const completed = plans.filter(p => p.status !== 'draft')

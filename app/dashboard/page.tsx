@@ -29,24 +29,29 @@ export default function Dashboard() {
   const { user } = useAuth()
   const [plans, setPlans] = useState<PlanSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
 
   useEffect(() => {
     if (!user) return
 
     async function fetchPlans() {
-      const { data } = await supabase
-        .from('production_plans')
-        .select('id, status, client_name, client_address, sale_price, is_retail, is_insurance, has_roof, has_siding, has_guttering, has_windows, has_small_jobs, created_at, updated_at')
-        .eq('created_by', user!.id)
-        .order('updated_at', { ascending: false })
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('production_plans')
+          .select('id, status, client_name, client_address, sale_price, is_retail, is_insurance, has_roof, has_siding, has_guttering, has_windows, has_small_jobs, created_at, updated_at')
+          .eq('created_by', user!.id)
+          .order('updated_at', { ascending: false })
 
-      setPlans(data || [])
+        if (error) console.warn('Plans fetch error:', error.message)
+        setPlans(data || [])
+      } catch (err) {
+        console.warn('Plans fetch error:', err)
+      }
       setLoading(false)
     }
 
     fetchPlans()
-  }, [user, supabase])
+  }, [user])
 
   const drafts = plans.filter(p => p.status === 'draft')
   const completed = plans.filter(p => p.status !== 'draft')

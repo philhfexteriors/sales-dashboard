@@ -53,6 +53,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    let didFinish = false
+
+    // Safety timeout — never hang longer than 8 seconds
+    const timeout = setTimeout(() => {
+      if (!didFinish) {
+        console.warn('AuthProvider: safety timeout reached, forcing loading=false')
+        setLoading(false)
+        didFinish = true
+      }
+    }, 8000)
+
     const getUser = async () => {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -66,7 +77,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.warn('Auth init error:', err)
       }
-      setLoading(false)
+      if (!didFinish) {
+        setLoading(false)
+        didFinish = true
+      }
+      clearTimeout(timeout)
     }
 
     getUser()
@@ -88,7 +103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

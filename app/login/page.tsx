@@ -14,7 +14,8 @@ export default function Login() {
         router.push('/dashboard')
       }
     })
-  }, [router, supabase.auth])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function signInWithGoogle() {
     await supabase.auth.signInWithOAuth({

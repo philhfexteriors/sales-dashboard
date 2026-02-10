@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import ProductionPlanPDF from '@/lib/pdf/ProductionPlanPDF'
 import { sendPlanEmail } from '@/lib/services/email'
+import { createCCClient } from '@/lib/services/contractorsCloudApi'
 import React from 'react'
 
 export async function POST(
@@ -72,6 +73,44 @@ export async function POST(
     return NextResponse.json({ error: result.error }, { status: 500 })
   }
 
+  // Upload PDF to Contractors Cloud project files (if CC account is linked)
+  let ccUploadResult: { success: boolean; error?: string } = { success: false }
+  if (plan.cc_account_id) {
+    try {
+      const ccClient = createCCClient()
+      if (ccClient) {
+        // Find the most recent project for this account
+        const projects = await ccClient.getProjectsByAccount(plan.cc_account_id)
+        if (projects.length > 0) {
+          const projectId = projects[0].id
+          const fileTypeId = process.env.CC_CONTRACT_FILE_TYPE_ID
+            ? parseInt(process.env.CC_CONTRACT_FILE_TYPE_ID)
+            : undefined
+
+          await ccClient.uploadProjectFile(
+            projectId,
+            Buffer.from(pdfBuffer),
+            pdfFileName,
+            {
+              fileTypeId,  // "Contract" folder ID — set via CC_CONTRACT_FILE_TYPE_ID env var
+              isVisibleOnCustomerPortal: false,
+            }
+          )
+          ccUploadResult = { success: true }
+          console.log(`CC: Uploaded PDF to project ${projectId} for account ${plan.cc_account_id}`)
+        } else {
+          ccUploadResult = { success: false, error: 'No project found for this account' }
+          console.warn(`CC: No projects found for account ${plan.cc_account_id}`)
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown CC upload error'
+      ccUploadResult = { success: false, error: msg }
+      console.error(`CC upload failed: ${msg}`)
+      // Don't fail the entire send — email was already sent successfully
+    }
+  }
+
   // Update plan status
   await supabase
     .from('production_plans')
@@ -81,5 +120,8 @@ export async function POST(
     })
     .eq('id', id)
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({
+    success: true,
+    cc_upload: plan.cc_account_id ? ccUploadResult : null,
+  })
 }

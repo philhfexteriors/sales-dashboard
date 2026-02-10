@@ -271,6 +271,86 @@ export default function ProductsAdmin() {
     }
   }
 
+  async function renameOption(option: Option, newName: string) {
+    if (!newName.trim() || newName.trim() === option.name) return
+    const res = await fetch(`/api/products/options/${option.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName.trim() }),
+    })
+    if (res.ok) {
+      toast.success('Renamed')
+      if (selectedCategory) fetchOptions(selectedCategory.id)
+    } else {
+      toast.error('Failed to rename')
+    }
+  }
+
+  async function deleteOption(option: Option) {
+    const children = options.filter(o => o.parent_id === option.id)
+    const msg = children.length > 0
+      ? `Delete "${option.name}" and its ${children.length} child option${children.length > 1 ? 's' : ''}? This cannot be undone.`
+      : `Delete "${option.name}"? This cannot be undone.`
+    if (!confirm(msg)) return
+
+    // Delete children first (they have FK to parent)
+    for (const child of children) {
+      // Recursively get grandchildren
+      const grandchildren = options.filter(o => o.parent_id === child.id)
+      for (const gc of grandchildren) {
+        await fetch(`/api/products/options/${gc.id}`, { method: 'DELETE' })
+      }
+      await fetch(`/api/products/options/${child.id}`, { method: 'DELETE' })
+    }
+
+    const res = await fetch(`/api/products/options/${option.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('Deleted')
+      if (selectedCategory) fetchOptions(selectedCategory.id)
+    } else {
+      toast.error('Failed to delete')
+    }
+  }
+
+  async function renameCategory(cat: Category, newName: string) {
+    if (!newName.trim() || newName.trim() === cat.name) return
+    const res = await fetch(`/api/products/categories/${cat.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName.trim() }),
+    })
+    if (res.ok) {
+      toast.success('Renamed')
+      fetchCategories()
+      if (selectedCategory?.id === cat.id) {
+        const updated = await res.json()
+        setSelectedCategory(updated)
+      }
+    } else {
+      toast.error('Failed to rename')
+    }
+  }
+
+  async function deleteCategory(cat: Category) {
+    const optCount = options.filter(o => o.category_id === cat.id).length
+    const msg = optCount > 0
+      ? `Delete "${cat.name}" and all its ${optCount} option${optCount > 1 ? 's' : ''}? This cannot be undone.`
+      : `Delete "${cat.name}"? This cannot be undone.`
+    if (!confirm(msg)) return
+
+    const res = await fetch(`/api/products/categories/${cat.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('Deleted')
+      if (selectedCategory?.id === cat.id) {
+        setSelectedCategory(null)
+        setOptions([])
+      }
+      fetchCategories()
+    } else {
+      toast.error('Failed to delete')
+    }
+  }
+
   function selectCategory(cat: Category) {
     setSelectedCategory(cat)
     fetchOptions(cat.id)
@@ -433,63 +513,19 @@ export default function ProductsAdmin() {
                 ) : (
                   <div className="space-y-1">
                     {sectionCategories.map((cat, idx) => (
-                      <div
+                      <FieldItem
                         key={cat.id}
-                        className={`rounded-lg transition-colors ${
-                          selectedCategory?.id === cat.id
-                            ? 'bg-primary/10'
-                            : 'hover:bg-gray-50'
-                        } ${!cat.active ? 'opacity-50' : ''}`}
-                      >
-                        <div className="flex items-center gap-1">
-                          {/* Sort arrows */}
-                          <div className="flex flex-col">
-                            <button
-                              onClick={() => moveCategorySort(cat, 'up')}
-                              disabled={idx === 0}
-                              className="text-gray-300 hover:text-gray-500 disabled:opacity-20 p-0.5"
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => moveCategorySort(cat, 'down')}
-                              disabled={idx === sectionCategories.length - 1}
-                              className="text-gray-300 hover:text-gray-500 disabled:opacity-20 p-0.5"
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </button>
-                          </div>
-
-                          <button
-                            onClick={() => selectCategory(cat)}
-                            className={`flex-1 text-left px-2 py-2 text-sm ${
-                              selectedCategory?.id === cat.id
-                                ? 'text-primary font-medium'
-                                : 'text-gray-700'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="truncate">{cat.name}</span>
-                              <FieldTypeBadge type={cat.field_type} />
-                            </div>
-                          </button>
-
-                          <button
-                            onClick={(e) => { e.stopPropagation(); toggleCategoryActive(cat) }}
-                            className={`text-xs px-2 py-0.5 rounded mr-1 shrink-0 ${
-                              cat.active
-                                ? 'text-green-700 bg-green-50 hover:bg-green-100'
-                                : 'text-red-700 bg-red-50 hover:bg-red-100'
-                            }`}
-                          >
-                            {cat.active ? 'Active' : 'Inactive'}
-                          </button>
-                        </div>
-                      </div>
+                        cat={cat}
+                        idx={idx}
+                        total={sectionCategories.length}
+                        isSelected={selectedCategory?.id === cat.id}
+                        onSelect={() => selectCategory(cat)}
+                        onToggleActive={() => toggleCategoryActive(cat)}
+                        onMoveUp={() => moveCategorySort(cat, 'up')}
+                        onMoveDown={() => moveCategorySort(cat, 'down')}
+                        onRename={(newName) => renameCategory(cat, newName)}
+                        onDelete={() => deleteCategory(cat)}
+                      />
                     ))}
                   </div>
                 )}
@@ -652,6 +688,8 @@ export default function ProductsAdmin() {
                                   option={opt}
                                   getChildren={getChildren}
                                   onToggleActive={toggleOptionActive}
+                                  onRename={renameOption}
+                                  onDelete={deleteOption}
                                   onAddChild={(parentId, level) => {
                                     setNewOptionParentId(parentId)
                                     setNewOptionLevel(level)
@@ -692,10 +730,134 @@ export default function ProductsAdmin() {
   )
 }
 
+// Inline-editable field item in the sidebar
+function FieldItem({
+  cat,
+  idx,
+  total,
+  isSelected,
+  onSelect,
+  onToggleActive,
+  onMoveUp,
+  onMoveDown,
+  onRename,
+  onDelete,
+}: {
+  cat: Category
+  idx: number
+  total: number
+  isSelected: boolean
+  onSelect: () => void
+  onToggleActive: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onRename: (newName: string) => void
+  onDelete: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState(cat.name)
+
+  const ft = FIELD_TYPES.find(f => f.value === cat.field_type)
+
+  function handleSaveEdit() {
+    onRename(editName)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="rounded-lg bg-primary/10 p-2">
+        <div className="flex gap-1.5">
+          <input
+            type="text"
+            value={editName}
+            onChange={e => setEditName(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleSaveEdit()
+              if (e.key === 'Escape') { setEditing(false); setEditName(cat.name) }
+            }}
+            className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            autoFocus
+          />
+          <button onClick={handleSaveEdit} className="px-2 py-1.5 bg-primary text-white rounded text-xs">Save</button>
+          <button onClick={() => { setEditing(false); setEditName(cat.name) }} className="px-2 py-1.5 text-gray-500 text-xs">Cancel</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={`rounded-lg transition-colors group/field ${
+        isSelected ? 'bg-primary/10' : 'hover:bg-gray-50'
+      } ${!cat.active ? 'opacity-50' : ''}`}
+    >
+      <div className="flex items-center gap-1">
+        {/* Sort arrows */}
+        <div className="flex flex-col">
+          <button onClick={onMoveUp} disabled={idx === 0} className="text-gray-300 hover:text-gray-500 disabled:opacity-20 p-0.5">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            </svg>
+          </button>
+          <button onClick={onMoveDown} disabled={idx === total - 1} className="text-gray-300 hover:text-gray-500 disabled:opacity-20 p-0.5">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+
+        <button onClick={onSelect} className={`flex-1 text-left px-2 py-2 text-sm min-w-0 ${isSelected ? 'text-primary font-medium' : 'text-gray-700'}`}>
+          <div className="flex items-center gap-2">
+            <span className="truncate">{cat.name}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 whitespace-nowrap shrink-0">
+              {ft?.icon || '?'} {ft?.label?.split(' (')[0] || cat.field_type}
+            </span>
+          </div>
+        </button>
+
+        {/* Edit + Delete — visible on hover */}
+        <button
+          onClick={(e) => { e.stopPropagation(); setEditing(true); setEditName(cat.name) }}
+          className="text-gray-300 hover:text-gray-500 p-1 opacity-0 group-hover/field:opacity-100 transition-opacity"
+          title="Edit name"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          </svg>
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete() }}
+          className="text-gray-300 hover:text-red-500 p-1 opacity-0 group-hover/field:opacity-100 transition-opacity"
+          title="Delete field"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleActive() }}
+          className={`text-xs px-2 py-0.5 rounded mr-1 shrink-0 ${
+            cat.active
+              ? 'text-green-700 bg-green-50 hover:bg-green-100'
+              : 'text-red-700 bg-red-50 hover:bg-red-100'
+          }`}
+        >
+          {cat.active ? 'Active' : 'Inactive'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Option tree node with inline edit + delete
 function OptionNode({
   option,
   getChildren,
   onToggleActive,
+  onRename,
+  onDelete,
   onAddChild,
   levelLabels,
   maxLevels,
@@ -704,62 +866,113 @@ function OptionNode({
   option: Option
   getChildren: (parentId: string) => Option[]
   onToggleActive: (opt: Option) => void
+  onRename: (opt: Option, newName: string) => void
+  onDelete: (opt: Option) => void
   onAddChild: (parentId: string, level: number) => void
   levelLabels: string[]
   maxLevels: number
   depth?: number
 }) {
   const [expanded, setExpanded] = useState(true)
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState(option.name)
   const children = getChildren(option.id)
   const nextLevel = option.level + 1
   const canHaveChildren = nextLevel < maxLevels
+
+  function handleSaveEdit() {
+    onRename(option, editName)
+    setEditing(false)
+  }
 
   return (
     <div className={depth > 0 ? 'ml-6 border-l-2 border-gray-100 pl-3' : ''}>
       <div className={`flex items-center gap-2 py-2 px-3 rounded-lg group hover:bg-gray-50 ${!option.active ? 'opacity-50' : ''}`}>
         {children.length > 0 ? (
-          <button onClick={() => setExpanded(!expanded)} className="text-gray-400 hover:text-gray-600">
+          <button onClick={() => setExpanded(!expanded)} className="text-gray-400 hover:text-gray-600 shrink-0">
             <svg className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
         ) : (
-          <div className="w-4" />
+          <div className="w-4 shrink-0" />
         )}
 
-        <span className={`flex-1 text-sm ${depth === 0 ? 'font-medium' : ''}`}>
-          {option.name}
-        </span>
+        {editing ? (
+          <div className="flex-1 flex gap-1.5">
+            <input
+              type="text"
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleSaveEdit()
+                if (e.key === 'Escape') { setEditing(false); setEditName(option.name) }
+              }}
+              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              autoFocus
+            />
+            <button onClick={handleSaveEdit} className="px-2 py-1 bg-primary text-white rounded text-xs">Save</button>
+            <button onClick={() => { setEditing(false); setEditName(option.name) }} className="px-2 py-1 text-gray-500 text-xs">Cancel</button>
+          </div>
+        ) : (
+          <>
+            <span className={`flex-1 text-sm ${depth === 0 ? 'font-medium' : ''}`}>
+              {option.name}
+            </span>
 
-        {option.notes && (
-          <span className="text-xs text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">
-            {option.notes}
-          </span>
+            {option.notes && (
+              <span className="text-xs text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">
+                {option.notes}
+              </span>
+            )}
+
+            <span className="text-xs text-gray-400 hidden group-hover:inline">
+              {levelLabels[option.level] || ''}
+            </span>
+
+            {canHaveChildren && (
+              <button
+                onClick={() => onAddChild(option.id, nextLevel)}
+                className="text-xs text-primary hover:text-primary-dark opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                + {levelLabels[nextLevel] || 'Child'}
+              </button>
+            )}
+
+            {/* Edit button */}
+            <button
+              onClick={() => { setEditing(true); setEditName(option.name) }}
+              className="text-gray-300 hover:text-gray-500 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Edit name"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+
+            {/* Delete button */}
+            <button
+              onClick={() => onDelete(option)}
+              className="text-gray-300 hover:text-red-500 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Delete"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+
+            <button
+              onClick={() => onToggleActive(option)}
+              className={`text-xs px-2 py-0.5 rounded ${
+                option.active
+                  ? 'text-green-700 bg-green-50 hover:bg-green-100'
+                  : 'text-red-700 bg-red-50 hover:bg-red-100'
+              }`}
+            >
+              {option.active ? 'Active' : 'Inactive'}
+            </button>
+          </>
         )}
-
-        <span className="text-xs text-gray-400 hidden group-hover:inline">
-          {levelLabels[option.level] || ''}
-        </span>
-
-        {canHaveChildren && (
-          <button
-            onClick={() => onAddChild(option.id, nextLevel)}
-            className="text-xs text-primary hover:text-primary-dark opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            + {levelLabels[nextLevel] || 'Child'}
-          </button>
-        )}
-
-        <button
-          onClick={() => onToggleActive(option)}
-          className={`text-xs px-2 py-0.5 rounded ${
-            option.active
-              ? 'text-green-700 bg-green-50 hover:bg-green-100'
-              : 'text-red-700 bg-red-50 hover:bg-red-100'
-          }`}
-        >
-          {option.active ? 'Active' : 'Inactive'}
-        </button>
       </div>
 
       {expanded && children.length > 0 && (
@@ -770,6 +983,8 @@ function OptionNode({
               option={child}
               getChildren={getChildren}
               onToggleActive={onToggleActive}
+              onRename={onRename}
+              onDelete={onDelete}
               onAddChild={onAddChild}
               levelLabels={levelLabels}
               maxLevels={maxLevels}

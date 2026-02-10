@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import AppShell from '@/components/AppShell'
 import RoleGuard from '@/components/RoleGuard'
 import Loading from '@/components/Loading'
@@ -25,6 +25,24 @@ interface Option {
   active: boolean
 }
 
+// Predefined product types per section — these are what the forms expect
+const SECTION_PRODUCT_TYPES: Record<string, { name: string; levels: number; levelLabels: [string, string, string] }[]> = {
+  roof: [
+    { name: 'Shingles', levels: 3, levelLabels: ['Brand', 'Line', 'Color'] },
+    { name: 'Ventilation', levels: 1, levelLabels: ['Type', '', ''] },
+    { name: 'Pipe Boots', levels: 1, levelLabels: ['Type', '', ''] },
+    { name: 'Drip Edge', levels: 1, levelLabels: ['Type', '', ''] },
+  ],
+  siding: [
+    { name: 'Siding', levels: 3, levelLabels: ['Brand', 'Line', 'Color'] },
+    { name: 'Fascia', levels: 3, levelLabels: ['Brand', 'Color', 'Size'] },
+    { name: 'Soffit', levels: 3, levelLabels: ['Brand', 'Color', 'Type'] },
+  ],
+  guttering: [],
+  windows: [],
+  small_jobs: [],
+}
+
 const SECTIONS = [
   { key: 'roof', label: 'Roof' },
   { key: 'siding', label: 'Siding' },
@@ -32,8 +50,6 @@ const SECTIONS = [
   { key: 'windows', label: 'Windows' },
   { key: 'small_jobs', label: 'Small Jobs' },
 ]
-
-const LEVEL_LABELS = ['Brand / Type', 'Line / Model', 'Color / Variant']
 
 type FilterMode = 'active' | 'inactive' | 'all'
 
@@ -46,25 +62,51 @@ export default function ProductsAdmin() {
   const [activeSection, setActiveSection] = useState('roof')
   const [filterMode, setFilterMode] = useState<FilterMode>('active')
 
-  // New category form
-  const [newCatName, setNewCatName] = useState('')
-  const [showNewCat, setShowNewCat] = useState(false)
-
   // New option form
   const [newOptionName, setNewOptionName] = useState('')
   const [newOptionParentId, setNewOptionParentId] = useState<string | null>(null)
   const [newOptionLevel, setNewOptionLevel] = useState(0)
   const [showNewOption, setShowNewOption] = useState(false)
 
-  useEffect(() => {
-    fetchCategories()
-  }, [])
-
-  async function fetchCategories() {
+  const fetchCategories = useCallback(async () => {
     const res = await fetch('/api/products/categories')
     const data = await res.json()
     setCategories(data)
-    setLoading(false)
+    return data as Category[]
+  }, [])
+
+  // On load: fetch categories and auto-create any missing predefined ones
+  useEffect(() => {
+    async function init() {
+      const cats = await fetchCategories()
+      await ensureCategories(cats)
+      setLoading(false)
+    }
+    init()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function ensureCategories(existingCats: Category[]) {
+    let created = false
+    for (const [section, types] of Object.entries(SECTION_PRODUCT_TYPES)) {
+      for (let i = 0; i < types.length; i++) {
+        const type = types[i]
+        const exists = existingCats.some(
+          c => c.section === section && c.name.toLowerCase() === type.name.toLowerCase()
+        )
+        if (!exists) {
+          await fetch('/api/products/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ section, name: type.name, sort_order: i }),
+          })
+          created = true
+        }
+      }
+    }
+    if (created) {
+      await fetchCategories()
+    }
   }
 
   async function fetchOptions(categoryId: string) {
@@ -73,23 +115,6 @@ export default function ProductsAdmin() {
     const data = await res.json()
     setOptions(data)
     setOptionsLoading(false)
-  }
-
-  async function createCategory() {
-    if (!newCatName.trim()) return
-    const res = await fetch('/api/products/categories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ section: activeSection, name: newCatName.trim() }),
-    })
-    if (res.ok) {
-      toast.success('Category created')
-      setNewCatName('')
-      setShowNewCat(false)
-      fetchCategories()
-    } else {
-      toast.error('Failed to create category')
-    }
   }
 
   async function createOption() {
@@ -121,10 +146,10 @@ export default function ProductsAdmin() {
       body: JSON.stringify({ active: !cat.active }),
     })
     if (res.ok) {
-      toast.success(cat.active ? 'Category deactivated' : 'Category activated')
+      toast.success(cat.active ? 'Deactivated' : 'Activated')
       fetchCategories()
     } else {
-      toast.error('Failed to update category')
+      toast.error('Failed to update')
     }
   }
 
@@ -146,13 +171,29 @@ export default function ProductsAdmin() {
     setShowNewOption(false)
   }
 
-  // Filter categories by section and active status
-  const sectionCategories = categories.filter(c => {
-    if (c.section !== activeSection) return false
-    if (filterMode === 'active') return c.active
-    if (filterMode === 'inactive') return !c.active
+  // Get product types for current section
+  const productTypes = SECTION_PRODUCT_TYPES[activeSection] || []
+
+  // Filter categories for current section
+  const sectionCategories = categories.filter(c => c.section === activeSection)
+
+  // Match predefined types to existing categories
+  const productTypeItems = productTypes.map(pt => {
+    const cat = sectionCategories.find(c => c.name.toLowerCase() === pt.name.toLowerCase())
+    return { ...pt, category: cat }
+  }).filter(pt => {
+    if (!pt.category) return false
+    if (filterMode === 'active') return pt.category.active
+    if (filterMode === 'inactive') return !pt.category.active
     return true
   })
+
+  // Get the level labels for the selected category
+  const selectedType = productTypes.find(
+    pt => selectedCategory && pt.name.toLowerCase() === selectedCategory.name.toLowerCase()
+  )
+  const levelLabels = selectedType?.levelLabels || ['Brand / Type', 'Line / Model', 'Color / Variant']
+  const maxLevels = selectedType?.levels || 3
 
   // Filter options by active status
   const filteredOptions = options.filter(o => {
@@ -213,74 +254,55 @@ export default function ProductsAdmin() {
 
           {loading ? (
             <Loading message="Loading catalog..." />
+          ) : productTypes.length === 0 ? (
+            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+              <p className="text-gray-500">
+                {activeSection === 'guttering' ? 'Guttering' : activeSection === 'windows' ? 'Windows' : 'Small Jobs'} uses free-form entries on the production plan.
+              </p>
+              <p className="text-sm text-gray-400 mt-1">No product catalog needed for this section.</p>
+            </div>
           ) : (
             <div className="grid md:grid-cols-3 gap-6">
-              {/* Categories column */}
+              {/* Product types column */}
               <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="font-semibold text-gray-900">Categories</h2>
-                  <button
-                    onClick={() => setShowNewCat(!showNewCat)}
-                    className="text-primary hover:text-primary-dark text-sm font-medium"
-                  >
-                    + Add
-                  </button>
-                </div>
-
-                {showNewCat && (
-                  <div className="flex gap-2 mb-3">
-                    <input
-                      type="text"
-                      value={newCatName}
-                      onChange={e => setNewCatName(e.target.value)}
-                      placeholder="Category name"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                      onKeyDown={e => e.key === 'Enter' && createCategory()}
-                    />
-                    <button
-                      onClick={createCategory}
-                      className="px-3 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark"
-                    >
-                      Add
-                    </button>
-                  </div>
-                )}
-
-                {sectionCategories.length === 0 ? (
+                <h2 className="font-semibold text-gray-900 mb-3">Product Types</h2>
+                {productTypeItems.length === 0 ? (
                   <p className="text-sm text-gray-400 py-4 text-center">
-                    {filterMode === 'inactive' ? 'No inactive categories' : 'No categories yet'}
+                    {filterMode === 'inactive' ? 'No inactive product types' : 'Loading...'}
                   </p>
                 ) : (
                   <div className="space-y-1">
-                    {sectionCategories.map(cat => (
+                    {productTypeItems.map(pt => (
                       <div
-                        key={cat.id}
+                        key={pt.name}
                         className={`flex items-center gap-2 rounded-lg transition-colors ${
-                          selectedCategory?.id === cat.id
+                          selectedCategory?.id === pt.category?.id
                             ? 'bg-primary/10'
                             : 'hover:bg-gray-50'
-                        } ${!cat.active ? 'opacity-50' : ''}`}
+                        } ${pt.category && !pt.category.active ? 'opacity-50' : ''}`}
                       >
                         <button
-                          onClick={() => selectCategory(cat)}
+                          onClick={() => pt.category && selectCategory(pt.category)}
                           className={`flex-1 text-left px-3 py-2.5 text-sm ${
-                            selectedCategory?.id === cat.id
+                            selectedCategory?.id === pt.category?.id
                               ? 'text-primary font-medium'
                               : 'text-gray-700'
                           }`}
                         >
-                          {cat.name}
+                          {pt.name}
                         </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleCategoryActive(cat) }}
-                          className={`text-xs px-2 py-0.5 rounded mr-2 shrink-0 ${
-                            cat.active
-                              ? 'text-green-700 bg-green-50 hover:bg-green-100'
-                              : 'text-red-700 bg-red-50 hover:bg-red-100'
-                          }`}
-                        >
-                          {cat.active ? 'Active' : 'Inactive'}
-                        </button>
+                        {pt.category && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleCategoryActive(pt.category!) }}
+                            className={`text-xs px-2 py-0.5 rounded mr-2 shrink-0 ${
+                              pt.category.active
+                                ? 'text-green-700 bg-green-50 hover:bg-green-100'
+                                : 'text-red-700 bg-red-50 hover:bg-red-100'
+                            }`}
+                          >
+                            {pt.category.active ? 'Active' : 'Inactive'}
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -290,7 +312,7 @@ export default function ProductsAdmin() {
               {/* Options tree (2 columns wide) */}
               <div className="md:col-span-2 bg-white rounded-lg border border-gray-200 p-4">
                 {!selectedCategory ? (
-                  <p className="text-sm text-gray-400 py-8 text-center">Select a category to manage options</p>
+                  <p className="text-sm text-gray-400 py-8 text-center">Select a product type to manage options</p>
                 ) : optionsLoading ? (
                   <Loading message="Loading options..." />
                 ) : (
@@ -305,7 +327,7 @@ export default function ProductsAdmin() {
                         }}
                         className="text-primary hover:text-primary-dark text-sm font-medium"
                       >
-                        + Add {LEVEL_LABELS[0]}
+                        + Add {levelLabels[0]}
                       </button>
                     </div>
 
@@ -315,7 +337,7 @@ export default function ProductsAdmin() {
                           type="text"
                           value={newOptionName}
                           onChange={e => setNewOptionName(e.target.value)}
-                          placeholder={`${LEVEL_LABELS[newOptionLevel]} name`}
+                          placeholder={`${levelLabels[newOptionLevel]} name`}
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                           onKeyDown={e => e.key === 'Enter' && createOption()}
                           autoFocus
@@ -339,7 +361,7 @@ export default function ProductsAdmin() {
                       <p className="text-sm text-gray-400 py-8 text-center">
                         {filterMode === 'inactive'
                           ? 'No inactive options'
-                          : `No options yet. Add a ${LEVEL_LABELS[0]} to get started.`
+                          : `No options yet. Add a ${levelLabels[0]} to get started.`
                         }
                       </p>
                     ) : (
@@ -356,6 +378,8 @@ export default function ProductsAdmin() {
                               setShowNewOption(true)
                               setNewOptionName('')
                             }}
+                            levelLabels={levelLabels}
+                            maxLevels={maxLevels}
                           />
                         ))}
                       </div>
@@ -376,18 +400,22 @@ function OptionNode({
   getChildren,
   onToggleActive,
   onAddChild,
+  levelLabels,
+  maxLevels,
   depth = 0,
 }: {
   option: Option
   getChildren: (parentId: string) => Option[]
   onToggleActive: (opt: Option) => void
   onAddChild: (parentId: string, level: number) => void
+  levelLabels: [string, string, string]
+  maxLevels: number
   depth?: number
 }) {
   const [expanded, setExpanded] = useState(true)
   const children = getChildren(option.id)
   const nextLevel = option.level + 1
-  const canHaveChildren = nextLevel <= 2
+  const canHaveChildren = nextLevel < maxLevels
 
   return (
     <div className={depth > 0 ? 'ml-6 border-l-2 border-gray-100 pl-3' : ''}>
@@ -407,7 +435,7 @@ function OptionNode({
         </span>
 
         <span className="text-xs text-gray-400 hidden group-hover:inline">
-          {LEVEL_LABELS[option.level]}
+          {levelLabels[option.level] || ''}
         </span>
 
         {canHaveChildren && (
@@ -415,7 +443,7 @@ function OptionNode({
             onClick={() => onAddChild(option.id, nextLevel)}
             className="text-xs text-primary hover:text-primary-dark opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            + {LEVEL_LABELS[nextLevel]}
+            + {levelLabels[nextLevel] || 'Child'}
           </button>
         )}
 
@@ -440,6 +468,8 @@ function OptionNode({
               getChildren={getChildren}
               onToggleActive={onToggleActive}
               onAddChild={onAddChild}
+              levelLabels={levelLabels}
+              maxLevels={maxLevels}
               depth={depth + 1}
             />
           ))}

@@ -32,51 +32,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const supabase = createClient()
 
-  async function fetchProfile(userId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('role, display_name')
-        .eq('id', userId)
-        .single()
-
-      if (data && !error) {
-        setProfile({ role: data.role as UserRole, display_name: data.display_name })
-      } else {
-        console.warn('Profile fetch failed, using defaults:', error?.message)
-        setProfile({ role: 'salesperson', display_name: null })
-      }
-    } catch (err) {
-      console.warn('Profile fetch error:', err)
-      setProfile({ role: 'salesperson', display_name: null })
-    }
-  }
-
+  // Matches SM dashboard pattern exactly
   useEffect(() => {
-    // Use onAuthStateChange as primary — it fires INITIAL_SESSION immediately
-    // and is more reliable than getSession() which can hang on token refresh
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setUser(session?.user ?? null)
+      setLoading(false)
+    }
+
+    getUser()
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        const currentUser = session?.user ?? null
-        setUser(currentUser)
+      async (_event, session) => {
+        setUser(session?.user ?? null)
 
-        if (currentUser) {
-          await fetchProfile(currentUser.id)
-        } else {
-          setProfile(null)
-        }
-
-        setLoading(false)
-
-        if (event === 'SIGNED_OUT') {
+        if (_event === 'SIGNED_OUT') {
           router.push('/login')
         }
       }
     )
 
     return () => subscription.unsubscribe()
+  }, [supabase.auth, router])
+
+  // Fetch profile separately — never blocks loading state
+  useEffect(() => {
+    if (!user) { setProfile(null); return }
+
+    supabase
+      .from('user_profiles')
+      .select('role, display_name')
+      .eq('id', user.id)
+      .single()
+      .then(({ data, error }) => {
+        if (data && !error) {
+          setProfile({ role: data.role as UserRole, display_name: data.display_name })
+        } else {
+          setProfile({ role: 'salesperson', display_name: null })
+        }
+      })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [user?.id])
 
   const signOut = async () => {
     await supabase.auth.signOut()

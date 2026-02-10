@@ -111,7 +111,7 @@ export default function ProductsAdmin() {
 
   async function fetchOptions(categoryId: string) {
     setOptionsLoading(true)
-    const res = await fetch(`/api/products/options?category_id=${categoryId}`)
+    const res = await fetch(`/api/products/options?category_id=${categoryId}&all=true`)
     const data = await res.json()
     setOptions(data)
     setOptionsLoading(false)

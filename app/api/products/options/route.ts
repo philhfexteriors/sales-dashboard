@@ -10,6 +10,7 @@ export async function GET(request: Request) {
   const categoryId = searchParams.get('category_id')
   const parentId = searchParams.get('parent_id')
   const activeOnly = searchParams.get('active') === 'true'
+  const all = searchParams.get('all') === 'true'
 
   let query = supabase
     .from('product_options')
@@ -19,11 +20,15 @@ export async function GET(request: Request) {
 
   if (activeOnly) query = query.eq('active', true)
   if (categoryId) query = query.eq('category_id', categoryId)
-  if (parentId) {
-    query = query.eq('parent_id', parentId)
-  } else if (categoryId && !parentId) {
-    // If category specified but no parent, get root options (level 0)
-    query = query.is('parent_id', null)
+
+  // all=true returns every option in the category (for admin tree view)
+  // Otherwise, filter by parent_id for cascading dropdowns
+  if (!all) {
+    if (parentId) {
+      query = query.eq('parent_id', parentId)
+    } else if (categoryId && !parentId) {
+      query = query.is('parent_id', null)
+    }
   }
 
   const { data, error } = await query

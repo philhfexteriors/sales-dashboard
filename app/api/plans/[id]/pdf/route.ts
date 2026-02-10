@@ -4,6 +4,17 @@ import { renderToBuffer } from '@react-pdf/renderer'
 import ProductionPlanPDF from '@/lib/pdf/ProductionPlanPDF'
 import React from 'react'
 
+// Generate the standard PDF filename: "H&F Exteriors Production Plan - Client Name - Date.pdf"
+function makePdfFilename(plan: { client_name?: string; plan_date?: string; signed_at?: string }): string {
+  const clientName = (plan.client_name || 'Client').replace(/[^a-zA-Z0-9 ]/g, '').trim()
+  const dateStr = plan.plan_date
+    ? new Date(plan.plan_date + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+    : plan.signed_at
+      ? new Date(plan.signed_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+      : new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+  return `H&F Exteriors Production Plan - ${clientName} - ${dateStr}.pdf`
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -49,11 +60,12 @@ export async function POST(
   }) as any
   const pdfBuffer = await renderToBuffer(pdfElement)
 
-  // Upload to Supabase Storage
-  const fileName = `plan-${id}-${Date.now()}.pdf`
+  // Upload to Supabase Storage (use ID-based name for storage, user-friendly name for downloads)
+  const storageFileName = `plan-${id}-${Date.now()}.pdf`
+  const displayFileName = makePdfFilename(plan)
   const { error: uploadErr } = await supabase.storage
     .from('production-plans')
-    .upload(fileName, pdfBuffer, {
+    .upload(storageFileName, pdfBuffer, {
       contentType: 'application/pdf',
       upsert: true,
     })
@@ -64,7 +76,7 @@ export async function POST(
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${fileName}"`,
+        'Content-Disposition': `attachment; filename="${displayFileName}"`,
       },
     })
   }
@@ -72,7 +84,7 @@ export async function POST(
   // Get public URL
   const { data: urlData } = supabase.storage
     .from('production-plans')
-    .getPublicUrl(fileName)
+    .getPublicUrl(storageFileName)
 
   const pdfUrl = urlData?.publicUrl || null
 
@@ -84,7 +96,7 @@ export async function POST(
       .eq('id', id)
   }
 
-  return NextResponse.json({ pdf_url: pdfUrl, fileName })
+  return NextResponse.json({ pdf_url: pdfUrl, fileName: displayFileName })
 }
 
 // GET: download the PDF directly
@@ -133,8 +145,7 @@ export async function GET(
   }) as any
   const pdfBuffer = await renderToBuffer(pdfElement2)
 
-  const clientName = (plan.client_name || 'plan').replace(/[^a-zA-Z0-9]/g, '_')
-  const fileName = `HF_Production_Plan_${clientName}.pdf`
+  const fileName = makePdfFilename(plan)
 
   return new NextResponse(new Uint8Array(pdfBuffer), {
     headers: {

@@ -30,6 +30,9 @@ export interface PlanData {
   signature_data: string | null
   signed_at: string | null
   signed_by_name: string | null
+  salesperson_signature_data: string | null
+  salesperson_name: string | null
+  plan_date: string | null
   shingle_initials_data: string | null
   start_date_window_id: string | null
   payment_notes: string | null
@@ -88,6 +91,9 @@ const defaultPlan: PlanData = {
   signature_data: null,
   signed_at: null,
   signed_by_name: null,
+  salesperson_signature_data: null,
+  salesperson_name: null,
+  plan_date: null,
   shingle_initials_data: null,
   start_date_window_id: null,
   payment_notes: null,
@@ -191,6 +197,9 @@ export function PlanFormProvider({
             signature_data: plan.signature_data,
             signed_at: plan.signed_at,
             signed_by_name: plan.signed_by_name,
+            salesperson_signature_data: plan.salesperson_signature_data,
+            salesperson_name: plan.salesperson_name,
+            plan_date: plan.plan_date,
             shingle_initials_data: plan.shingle_initials_data,
           },
           lineItems,

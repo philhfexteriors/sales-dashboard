@@ -50,9 +50,15 @@ export async function POST(
   }) as any
   const pdfBuffer = await renderToBuffer(pdfElement)
 
-  // Send email
+  // Send email with properly formatted filename
   const clientName = plan.client_name || ''
-  const pdfFileName = `HF_Production_Plan_${clientName.replace(/[^a-zA-Z0-9]/g, '_') || 'plan'}.pdf`
+  const cleanName = (clientName || 'Client').replace(/[^a-zA-Z0-9 ]/g, '').trim()
+  const dateStr = plan.plan_date
+    ? new Date(plan.plan_date + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+    : plan.signed_at
+      ? new Date(plan.signed_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+      : new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+  const pdfFileName = `H&F Exteriors Production Plan - ${cleanName} - ${dateStr}.pdf`
 
   const result = await sendPlanEmail({
     clientEmail: plan.client_email || '',

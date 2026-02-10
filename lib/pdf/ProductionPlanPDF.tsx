@@ -190,6 +190,9 @@ interface PlanPDFData {
     signature_data: string | null
     signed_by_name: string | null
     signed_at: string | null
+    salesperson_signature_data: string | null
+    salesperson_name: string | null
+    plan_date: string | null
     shingle_initials_data: string | null
   }
   lineItems: {
@@ -203,7 +206,14 @@ interface PlanPDFData {
   termsContent: string | null
 }
 
-function fmt(val: number | null): string {
+// Format amounts — hide $0.00, show blank instead
+function fmtAmount(val: number | null): string {
+  if (val == null || val === 0) return ''
+  return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+}
+
+// Format for totals section — always show the value
+function fmtTotal(val: number | null): string {
   if (val == null) return '$0.00'
   return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 }
@@ -243,6 +253,22 @@ function getItemDisplay(item: PlanPDFData['lineItems'][0]): string {
   return parts.join(' — ') || '—'
 }
 
+// Check if a line item has meaningful data (selections, options, or description)
+function hasItemData(item: PlanPDFData['lineItems'][0]): boolean {
+  if (item.amount > 0) return true
+  if (item.description) return true
+  if (item.selections && Object.values(item.selections).some(v => v)) return true
+  if (item.options) {
+    for (const [k, v] of Object.entries(item.options)) {
+      if (k.endsWith('_id') || k === 'option_id') continue
+      if (typeof v === 'boolean' && v) return true
+      if (typeof v === 'string' && v) return true
+      if (typeof v === 'number' && v > 0) return true
+    }
+  }
+  return false
+}
+
 const SECTION_LABELS: Record<string, string> = {
   roof: 'Roof',
   siding: 'Siding',
@@ -257,12 +283,20 @@ export default function ProductionPlanPDF({ plan, lineItems, termsContent }: Pla
   const grouped = sections
     .map(s => ({
       section: s,
-      items: lineItems.filter(li => li.section === s && (li.amount > 0 || li.description)),
+      // Show items that have ANY data — amount, description, selections, or options
+      items: lineItems.filter(li => li.section === s && hasItemData(li)),
     }))
     .filter(g => g.items.length > 0)
 
   const address = [plan.client_address, plan.client_city, plan.client_state, plan.client_zip]
     .filter(Boolean).join(', ')
+
+  // Use plan_date if available, otherwise signed_at, otherwise today
+  const displayDate = plan.plan_date
+    ? new Date(plan.plan_date + 'T00:00:00').toLocaleDateString()
+    : plan.signed_at
+      ? new Date(plan.signed_at).toLocaleDateString()
+      : new Date().toLocaleDateString()
 
   return (
     <Document>
@@ -276,7 +310,7 @@ export default function ProductionPlanPDF({ plan, lineItems, termsContent }: Pla
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={{ fontSize: 8, color: GRAY_500 }}>
-              {plan.signed_at ? new Date(plan.signed_at).toLocaleDateString() : new Date().toLocaleDateString()}
+              {displayDate}
             </Text>
             <Text style={{ fontSize: 8, color: GRAY_500 }}>
               {[plan.is_retail && 'Retail', plan.is_insurance && 'Insurance'].filter(Boolean).join(' + ')}
@@ -313,7 +347,7 @@ export default function ProductionPlanPDF({ plan, lineItems, termsContent }: Pla
               <View key={`${item.section}-${item.field_key}`} style={[styles.row, idx % 2 === 1 ? styles.rowAlt : {}]}>
                 <Text style={styles.label}>{formatFieldKey(item.field_key)}</Text>
                 <Text style={styles.value}>{getItemDisplay(item)}</Text>
-                <Text style={styles.amount}>{fmt(item.amount)}</Text>
+                <Text style={styles.amount}>{fmtAmount(item.amount)}</Text>
               </View>
             ))}
           </View>
@@ -323,24 +357,24 @@ export default function ProductionPlanPDF({ plan, lineItems, termsContent }: Pla
         <View style={styles.totalSection}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Sale Price</Text>
-            <Text style={styles.totalValue}>{fmt(plan.sale_price)}</Text>
+            <Text style={styles.totalValue}>{fmtTotal(plan.sale_price)}</Text>
           </View>
           {plan.is_insurance && plan.insurance_proceeds != null && (
             <View style={styles.totalRow}>
               <Text style={styles.subtotalLabel}>Insurance Proceeds</Text>
-              <Text style={styles.subtotalValue}>{fmt(plan.insurance_proceeds)}</Text>
+              <Text style={styles.subtotalValue}>{fmtTotal(plan.insurance_proceeds)}</Text>
             </View>
           )}
           {plan.is_retail && plan.down_payment != null && (
             <View style={styles.totalRow}>
               <Text style={styles.subtotalLabel}>Down Payment</Text>
-              <Text style={styles.subtotalValue}>{fmt(plan.down_payment)}</Text>
+              <Text style={styles.subtotalValue}>{fmtTotal(plan.down_payment)}</Text>
             </View>
           )}
           {plan.out_of_pocket != null && (
             <View style={[styles.totalRow, { borderTopWidth: 1, borderTopColor: GRAY_200, paddingTop: 4, marginTop: 4 }]}>
               <Text style={styles.totalLabel}>Homeowner Out-of-Pocket</Text>
-              <Text style={styles.totalValue}>{fmt(plan.out_of_pocket)}</Text>
+              <Text style={styles.totalValue}>{fmtTotal(plan.out_of_pocket)}</Text>
             </View>
           )}
           {plan.payment_notes && (
@@ -358,9 +392,10 @@ export default function ProductionPlanPDF({ plan, lineItems, termsContent }: Pla
           </View>
         )}
 
-        {/* Signature */}
+        {/* Signatures — Client and Salesperson side by side */}
         <View style={styles.signatureSection}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            {/* Client Signature */}
             <View>
               <Text style={{ fontSize: 9, fontWeight: 600, marginBottom: 6 }}>Client Signature</Text>
               {plan.signature_data ? (
@@ -371,6 +406,20 @@ export default function ProductionPlanPDF({ plan, lineItems, termsContent }: Pla
               <Text style={styles.signatureLabel}>
                 {plan.signed_by_name || 'Name'}
                 {plan.signed_at ? ` — ${new Date(plan.signed_at).toLocaleDateString()}` : ''}
+              </Text>
+            </View>
+
+            {/* Salesperson Signature */}
+            <View>
+              <Text style={{ fontSize: 9, fontWeight: 600, marginBottom: 6 }}>Salesperson Signature</Text>
+              {plan.salesperson_signature_data ? (
+                <Image src={plan.salesperson_signature_data} style={styles.signatureImage} />
+              ) : (
+                <View style={styles.signatureLine} />
+              )}
+              <Text style={styles.signatureLabel}>
+                {plan.salesperson_name || 'Salesperson'}
+                {displayDate ? ` — ${displayDate}` : ''}
               </Text>
             </View>
           </View>

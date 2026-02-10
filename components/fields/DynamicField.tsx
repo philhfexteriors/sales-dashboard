@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { usePlanForm } from '@/components/PlanFormProvider'
 import CascadeSelect from './CascadeSelect'
 import ManagedSelect from './ManagedSelect'
@@ -23,6 +23,8 @@ export interface CategoryField {
     sub_fields?: SubField[]
     linked_to?: string
     match_from?: string
+    price_reminder?: boolean
+    price_reminder_text?: string
   } | null
   sort_order: number
   active: boolean
@@ -50,11 +52,34 @@ interface DynamicFieldProps {
 export default function DynamicField({ category, section }: DynamicFieldProps) {
   const { getLineItem, updateLineItem } = usePlanForm()
   const [fieldOptions, setFieldOptions] = useState<ProductOption[]>([])
+  const [showPriceReminder, setShowPriceReminder] = useState(false)
+  const fieldRef = useRef<HTMLDivElement>(null)
+  const reminderDismissedRef = useRef(false)
 
   const item = getLineItem(category.field_key, section)
   const amount = item?.amount || 0
   const options = (item?.options || {}) as Record<string, unknown>
   const selections = (item?.selections || {}) as Record<string, string>
+
+  // Check if the field has data (selections, options, or description)
+  const hasData = !!(
+    (item?.selections && Object.values(item.selections).some(v => v)) ||
+    (item?.options && Object.entries(item.options).some(([k, v]) => v && k !== 'count' ? true : (k === 'count' && (v as number) > 0))) ||
+    item?.description
+  )
+
+  // Price reminder: show popup when field has data but no price, on blur
+  const handleFieldBlur = useCallback((e: React.FocusEvent) => {
+    if (!category.config?.price_reminder) return
+    if (reminderDismissedRef.current) return
+    // Check if focus is leaving this field entirely
+    const relatedTarget = e.relatedTarget as HTMLElement | null
+    if (relatedTarget && fieldRef.current?.contains(relatedTarget)) return
+    // Show reminder if field has data but no price
+    if (hasData && amount === 0) {
+      setShowPriceReminder(true)
+    }
+  }, [category.config?.price_reminder, hasData, amount])
 
   // Fetch product_options for this category (for radio, checkbox, select types)
   useEffect(() => {
@@ -277,12 +302,22 @@ export default function DynamicField({ category, section }: DynamicFieldProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
+    <div
+      ref={fieldRef}
+      className="bg-white rounded-lg border border-gray-200 p-4 relative"
+      onBlur={handleFieldBlur}
+    >
       <div className="flex items-start justify-between gap-4 mb-3">
         <h3 className="font-medium text-gray-900">{category.name}</h3>
         <CurrencyInput
           value={amount}
-          onChange={val => updateLineItem(category.field_key, section, { amount: val })}
+          onChange={val => {
+            updateLineItem(category.field_key, section, { amount: val })
+            if (val > 0) {
+              setShowPriceReminder(false)
+              reminderDismissedRef.current = true
+            }
+          }}
           className="w-32 shrink-0"
         />
       </div>
@@ -290,6 +325,27 @@ export default function DynamicField({ category, section }: DynamicFieldProps) {
         {renderPrimaryField()}
         {renderSubFields()}
       </div>
+
+      {/* Price Reminder Popup */}
+      {showPriceReminder && (
+        <div className="absolute top-2 right-2 z-20 bg-amber-50 border border-amber-300 rounded-lg shadow-lg p-3 max-w-xs animate-in fade-in">
+          <div className="flex items-start gap-2">
+            <span className="text-amber-500 text-lg leading-none mt-0.5">!</span>
+            <div className="flex-1">
+              <p className="text-sm text-amber-800 font-medium">Price Reminder</p>
+              <p className="text-xs text-amber-700 mt-1">
+                {category.config?.price_reminder_text || `Don't forget to add a price for ${category.name}.`}
+              </p>
+            </div>
+            <button
+              onClick={() => { setShowPriceReminder(false); reminderDismissedRef.current = true }}
+              className="text-amber-400 hover:text-amber-600 text-sm leading-none"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

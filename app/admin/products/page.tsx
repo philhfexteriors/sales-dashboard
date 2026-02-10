@@ -17,6 +17,8 @@ interface CategoryConfig {
   sub_fields?: SubFieldConfig[]
   linked_to?: string
   match_from?: string
+  price_reminder?: boolean
+  price_reminder_text?: string
 }
 
 interface Category {
@@ -610,7 +612,36 @@ export default function ProductsAdmin() {
                             Allow deselect
                           </label>
                         )}
+                        <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedCategory.config?.price_reminder || false}
+                            onChange={e => {
+                              const newConfig = { ...(selectedCategory.config || {}), price_reminder: e.target.checked }
+                              updateCategoryProperty(selectedCategory, 'config', newConfig)
+                            }}
+                            className="rounded"
+                          />
+                          Price reminder popup
+                        </label>
                       </div>
+
+                      {/* Price reminder text (shown when price_reminder is enabled) */}
+                      {selectedCategory.config?.price_reminder && (
+                        <div className="mt-3">
+                          <label className="text-xs font-medium text-gray-500 block mb-1">Reminder text:</label>
+                          <input
+                            type="text"
+                            value={selectedCategory.config?.price_reminder_text || ''}
+                            onChange={e => {
+                              const newConfig = { ...(selectedCategory.config || {}), price_reminder_text: e.target.value }
+                              updateCategoryProperty(selectedCategory, 'config', newConfig)
+                            }}
+                            placeholder={`Don't forget to add a price for ${selectedCategory.name}.`}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* Options tree - only for types that use product_options */}

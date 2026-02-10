@@ -3,28 +3,18 @@
 import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/AppShell'
-import Loading from '@/components/Loading'
 import toast from 'react-hot-toast'
 
-export default function SignPlan({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
-  const router = useRouter()
+function useSignatureCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [signedName, setSignedName] = useState('')
-  const [saving, setSaving] = useState(false)
   const [hasSignature, setHasSignature] = useState(false)
   const [isDrawing, setIsDrawing] = useState(false)
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    // Simple canvas setup for signature
+  function initCanvas() {
     const canvas = canvasRef.current
     if (!canvas) return
-
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-
-    // Set canvas size
     const rect = canvas.getBoundingClientRect()
     canvas.width = rect.width * 2
     canvas.height = rect.height * 2
@@ -33,23 +23,15 @@ export default function SignPlan({ params }: { params: Promise<{ id: string }> }
     ctx.lineWidth = 2
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-
-    setLoading(false)
-  }, [])
+  }
 
   function getPos(e: React.TouchEvent | React.MouseEvent) {
     const canvas = canvasRef.current!
     const rect = canvas.getBoundingClientRect()
     if ('touches' in e) {
-      return {
-        x: e.touches[0].clientX - rect.left,
-        y: e.touches[0].clientY - rect.top,
-      }
+      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top }
     }
-    return {
-      x: (e as React.MouseEvent).clientX - rect.left,
-      y: (e as React.MouseEvent).clientY - rect.top,
-    }
+    return { x: (e as React.MouseEvent).clientX - rect.left, y: (e as React.MouseEvent).clientY - rect.top }
   }
 
   function startDraw(e: React.TouchEvent | React.MouseEvent) {
@@ -77,31 +59,71 @@ export default function SignPlan({ params }: { params: Promise<{ id: string }> }
     setIsDrawing(false)
   }
 
-  function clearSignature() {
+  function clear() {
     const canvas = canvasRef.current!
     const ctx = canvas.getContext('2d')!
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     setHasSignature(false)
   }
 
+  function toDataURL() {
+    return canvasRef.current!.toDataURL('image/png')
+  }
+
+  return { canvasRef, hasSignature, initCanvas, startDraw, draw, endDraw, clear, toDataURL }
+}
+
+export default function SignPlan({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
+  const router = useRouter()
+  const [saving, setSaving] = useState(false)
+
+  // Client signature
+  const clientSig = useSignatureCanvas()
+  const [signedName, setSignedName] = useState('')
+
+  // Salesperson signature
+  const spSig = useSignatureCanvas()
+  const [salespersonName, setSalespersonName] = useState('')
+
+  // Editable date
+  const [planDate, setPlanDate] = useState(() => {
+    const now = new Date()
+    return now.toISOString().split('T')[0] // YYYY-MM-DD
+  })
+
+  useEffect(() => {
+    // Initialize both canvases
+    clientSig.initCanvas()
+    spSig.initCanvas()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function handleComplete() {
-    if (!hasSignature || !signedName.trim()) {
-      toast.error('Please sign and enter your name')
+    if (!clientSig.hasSignature || !signedName.trim()) {
+      toast.error('Please have the client sign and enter their name')
+      return
+    }
+    if (!spSig.hasSignature || !salespersonName.trim()) {
+      toast.error('Please sign as salesperson and enter your name')
       return
     }
 
     setSaving(true)
-    const canvas = canvasRef.current!
-    const signatureData = canvas.toDataURL('image/png')
+    const clientSignatureData = clientSig.toDataURL()
+    const salespersonSignatureData = spSig.toDataURL()
 
     const res = await fetch(`/api/plans/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         plan: {
-          signature_data: signatureData,
+          signature_data: clientSignatureData,
           signed_by_name: signedName.trim(),
           signed_at: new Date().toISOString(),
+          salesperson_signature_data: salespersonSignatureData,
+          salesperson_name: salespersonName.trim(),
+          plan_date: planDate,
           status: 'signed',
         },
       }),
@@ -111,7 +133,7 @@ export default function SignPlan({ params }: { params: Promise<{ id: string }> }
       toast.success('Signed successfully!')
       router.push(`/plans/${id}/complete`)
     } else {
-      toast.error('Failed to save signature')
+      toast.error('Failed to save signatures')
       setSaving(false)
     }
   }
@@ -127,51 +149,103 @@ export default function SignPlan({ params }: { params: Promise<{ id: string }> }
           the Replacement Cost Value and Sale Price, but will not affect my out-of-pocket cost.
         </div>
 
-        {/* Signature Canvas */}
-        <div className="bg-white rounded-lg border-2 border-gray-300 mb-4 relative">
-          <canvas
-            ref={canvasRef}
-            className="w-full h-48 touch-none cursor-crosshair"
-            onMouseDown={startDraw}
-            onMouseMove={draw}
-            onMouseUp={endDraw}
-            onMouseLeave={endDraw}
-            onTouchStart={startDraw}
-            onTouchMove={draw}
-            onTouchEnd={endDraw}
-          />
-          {!hasSignature && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <p className="text-gray-300 text-lg">Sign here</p>
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end mb-6">
-          <button
-            onClick={clearSignature}
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
-            Clear Signature
-          </button>
-        </div>
-
-        {/* Printed Name */}
-        <div className="mb-8">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Print Name</label>
+        {/* Date */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
           <input
-            type="text"
-            value={signedName}
-            onChange={e => setSignedName(e.target.value)}
-            placeholder="Full name"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+            type="date"
+            value={planDate}
+            onChange={e => setPlanDate(e.target.value)}
+            className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
+        </div>
+
+        {/* Client Signature */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">Homeowner Signature</h2>
+
+          <div className="bg-white rounded-lg border-2 border-gray-300 mb-3 relative">
+            <canvas
+              ref={clientSig.canvasRef}
+              className="w-full h-48 touch-none cursor-crosshair"
+              onMouseDown={clientSig.startDraw}
+              onMouseMove={clientSig.draw}
+              onMouseUp={clientSig.endDraw}
+              onMouseLeave={clientSig.endDraw}
+              onTouchStart={clientSig.startDraw}
+              onTouchMove={clientSig.draw}
+              onTouchEnd={clientSig.endDraw}
+            />
+            {!clientSig.hasSignature && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <p className="text-gray-300 text-lg">Homeowner sign here</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end mb-3">
+            <button onClick={clientSig.clear} className="text-sm text-gray-500 hover:text-gray-700">
+              Clear
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Homeowner Print Name</label>
+            <input
+              type="text"
+              value={signedName}
+              onChange={e => setSignedName(e.target.value)}
+              placeholder="Full name"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+        </div>
+
+        {/* Salesperson Signature */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">Salesperson Signature</h2>
+
+          <div className="bg-white rounded-lg border-2 border-gray-300 mb-3 relative">
+            <canvas
+              ref={spSig.canvasRef}
+              className="w-full h-48 touch-none cursor-crosshair"
+              onMouseDown={spSig.startDraw}
+              onMouseMove={spSig.draw}
+              onMouseUp={spSig.endDraw}
+              onMouseLeave={spSig.endDraw}
+              onTouchStart={spSig.startDraw}
+              onTouchMove={spSig.draw}
+              onTouchEnd={spSig.endDraw}
+            />
+            {!spSig.hasSignature && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <p className="text-gray-300 text-lg">Salesperson sign here</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end mb-3">
+            <button onClick={spSig.clear} className="text-sm text-gray-500 hover:text-gray-700">
+              Clear
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Salesperson Print Name</label>
+            <input
+              type="text"
+              value={salespersonName}
+              onChange={e => setSalespersonName(e.target.value)}
+              placeholder="Full name"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
         </div>
 
         {/* Complete Button */}
         <button
           onClick={handleComplete}
-          disabled={saving || !hasSignature || !signedName.trim()}
+          disabled={saving || !clientSig.hasSignature || !signedName.trim() || !spSig.hasSignature || !salespersonName.trim()}
           className="w-full py-4 rounded-xl font-semibold bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? 'Saving...' : 'Complete & Send'}

@@ -53,13 +53,34 @@ export default function ReviewPlan({ params }: { params: Promise<{ id: string }>
     return <AppShell><div className="py-20"><Loading message="Loading review..." size="lg" /></div></AppShell>
   }
 
+  // For line item amounts — hide $0.00, show blank
   const fmt = (val: number | null) =>
+    val != null && val > 0 ? `$${val.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : ''
+
+  // For totals — always show value
+  const fmtTotal = (val: number | null) =>
     val != null ? `$${val.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'
+
+  // Show items with ANY data — selections, options, description, or amount
+  const hasItemData = (li: LineItem): boolean => {
+    if (li.amount > 0) return true
+    if (li.description) return true
+    if (li.selections && Object.values(li.selections).some(v => v)) return true
+    if (li.options) {
+      for (const [k, v] of Object.entries(li.options)) {
+        if (k.endsWith('_id') || k === 'option_id') continue
+        if (typeof v === 'boolean' && v) return true
+        if (typeof v === 'string' && v) return true
+        if (typeof v === 'number' && v > 0) return true
+      }
+    }
+    return false
+  }
 
   const sections = ['roof', 'siding', 'guttering', 'windows', 'small_jobs', 'misc']
   const grouped = sections.map(s => ({
     section: s,
-    items: lineItems.filter(li => li.section === s && (li.amount > 0 || li.description)),
+    items: lineItems.filter(li => li.section === s && hasItemData(li)),
   })).filter(g => g.items.length > 0)
 
   return (
@@ -97,7 +118,9 @@ export default function ReviewPlan({ params }: { params: Promise<{ id: string }>
                       </p>
                     )}
                   </div>
-                  <span className="font-medium">{fmt(item.amount)}</span>
+                  <span className={`font-medium ${item.amount > 0 ? '' : 'text-gray-300'}`}>
+                    {fmt(item.amount) || '—'}
+                  </span>
                 </div>
               ))}
             </div>
@@ -108,24 +131,24 @@ export default function ReviewPlan({ params }: { params: Promise<{ id: string }>
         <div className="bg-white rounded-lg border-2 border-primary/20 p-5 mb-6 space-y-2">
           <div className="flex justify-between text-lg font-semibold">
             <span>Sale Price</span>
-            <span className="text-primary">{fmt(plan.sale_price)}</span>
+            <span className="text-primary">{fmtTotal(plan.sale_price)}</span>
           </div>
           {plan.is_insurance && plan.insurance_proceeds != null && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Insurance Proceeds</span>
-              <span>{fmt(plan.insurance_proceeds)}</span>
+              <span>{fmtTotal(plan.insurance_proceeds)}</span>
             </div>
           )}
           {plan.is_retail && plan.down_payment != null && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Down Payment</span>
-              <span>{fmt(plan.down_payment)}</span>
+              <span>{fmtTotal(plan.down_payment)}</span>
             </div>
           )}
           {plan.out_of_pocket != null && (
             <div className="flex justify-between text-lg font-semibold pt-2 border-t">
               <span>Homeowner Out-of-pocket</span>
-              <span className="text-primary">{fmt(plan.out_of_pocket)}</span>
+              <span className="text-primary">{fmtTotal(plan.out_of_pocket)}</span>
             </div>
           )}
           {plan.payment_notes && (

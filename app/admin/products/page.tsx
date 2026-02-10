@@ -32,6 +32,8 @@ const SECTION_PRODUCT_TYPES: Record<string, { name: string; levels: number; leve
     { name: 'Ventilation', levels: 1, levelLabels: ['Type', '', ''] },
     { name: 'Pipe Boots', levels: 1, levelLabels: ['Type', '', ''] },
     { name: 'Drip Edge', levels: 1, levelLabels: ['Type', '', ''] },
+    { name: 'Ice & Water', levels: 1, levelLabels: ['Type', '', ''] },
+    { name: 'Skylights', levels: 2, levelLabels: ['Brand', 'Model', ''] },
   ],
   siding: [
     { name: 'Siding', levels: 3, levelLabels: ['Brand', 'Line', 'Color'] },

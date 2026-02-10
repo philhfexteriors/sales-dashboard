@@ -29,6 +29,8 @@ export default function RoofSection() {
   const ventCatId = getCategoryId('ventilat')
   const pipeBootsCatId = getCategoryId('pipe')
   const dripEdgeCatId = getCategoryId('drip')
+  const iceWaterCatId = getCategoryId('ice & water')
+  const skylightsCatId = getCategoryId('skylight')
 
   // Shingles
   const shingles = getLineItem('shingles', 'roof')
@@ -159,18 +161,33 @@ export default function RoofSection() {
 
       {/* Ice & Water */}
       <SectionField section="roof" fieldKey="ice_water" label="Ice & Water">
-        <CheckboxGroup
-          options={[
-            { value: 'eaves', label: 'Eaves' },
-            { value: 'valleys', label: 'Valleys' },
-          ]}
-          selected={selectedIce}
-          onChange={vals => {
-            const opts: Record<string, boolean> = {}
-            vals.forEach(v => opts[v] = true)
-            updateLineItem('ice_water', 'roof', { options: opts })
-          }}
-        />
+        <div className="space-y-3">
+          {iceWaterCatId && (
+            <ManagedSelect
+              categoryId={iceWaterCatId}
+              value={(iceWater?.options as Record<string, string>)?.product || ''}
+              onChange={(val, optId) => updateLineItem('ice_water', 'roof', {
+                options: { ...iceOptions, product: val, product_id: optId },
+              })}
+              placeholder="Select ice & water product..."
+              label="Product"
+              allowCustom
+            />
+          )}
+          <CheckboxGroup
+            options={[
+              { value: 'eaves', label: 'Eaves' },
+              { value: 'valleys', label: 'Valleys' },
+            ]}
+            selected={selectedIce}
+            onChange={vals => {
+              const currentOpts = (iceWater?.options || {}) as Record<string, unknown>
+              const opts: Record<string, unknown> = { product: currentOpts.product, product_id: currentOpts.product_id }
+              vals.forEach(v => opts[v] = true)
+              updateLineItem('ice_water', 'roof', { options: opts })
+            }}
+          />
+        </div>
       </SectionField>
 
       {/* Skylights */}
@@ -184,17 +201,28 @@ export default function RoofSection() {
             label="Count"
           />
           {(skyOptions.count as number) > 0 && (
-            <RadioGroup
-              options={[
-                { value: 'flash', label: 'Flash' },
-                { value: 'replace', label: 'Replace' },
-              ]}
-              selected={(skyOptions.action as string) || null}
-              onChange={val => updateLineItem('skylights', 'roof', {
-                options: { ...skyOptions, action: val }
-              })}
-              label="Action"
-            />
+            <>
+              {skylightsCatId && (
+                <CascadeSelect
+                  categoryId={skylightsCatId}
+                  value={(skylights?.selections || {}) as Record<string, string>}
+                  onChange={val => updateLineItem('skylights', 'roof', { selections: val })}
+                  labels={['Brand', 'Model', '']}
+                  levels={2}
+                />
+              )}
+              <RadioGroup
+                options={[
+                  { value: 'flash', label: 'Flash' },
+                  { value: 'replace', label: 'Replace' },
+                ]}
+                selected={(skyOptions.action as string) || null}
+                onChange={val => updateLineItem('skylights', 'roof', {
+                  options: { ...skyOptions, action: val }
+                })}
+                label="Action"
+              />
+            </>
           )}
         </div>
       </SectionField>

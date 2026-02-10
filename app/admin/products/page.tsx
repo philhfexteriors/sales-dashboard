@@ -6,10 +6,30 @@ import RoleGuard from '@/components/RoleGuard'
 import Loading from '@/components/Loading'
 import toast from 'react-hot-toast'
 
+interface SubFieldConfig {
+  key: string
+  label: string
+  type: string
+  show_when?: Record<string, string | boolean>
+}
+
+interface CategoryConfig {
+  sub_fields?: SubFieldConfig[]
+  linked_to?: string
+  match_from?: string
+}
+
 interface Category {
   id: string
   section: string
   name: string
+  field_key: string | null
+  field_type: string
+  cascade_levels: number
+  level_labels: string[] | null
+  allow_custom: boolean
+  allow_deselect: boolean
+  config: CategoryConfig | null
   sort_order: number
   active: boolean
 }
@@ -25,32 +45,21 @@ interface Option {
   active: boolean
 }
 
-// Predefined product types per section — these are what the forms expect
-const SECTION_PRODUCT_TYPES: Record<string, { name: string; levels: number; levelLabels: [string, string, string] }[]> = {
-  roof: [
-    { name: 'Shingles', levels: 3, levelLabels: ['Brand', 'Line', 'Color'] },
-    { name: 'Ventilation', levels: 1, levelLabels: ['Type', '', ''] },
-    { name: 'Pipe Boots', levels: 1, levelLabels: ['Type', '', ''] },
-    { name: 'Drip Edge', levels: 1, levelLabels: ['Type', '', ''] },
-    { name: 'Ice & Water', levels: 1, levelLabels: ['Type', '', ''] },
-    { name: 'Skylights', levels: 2, levelLabels: ['Brand', 'Model', ''] },
-  ],
-  siding: [
-    { name: 'Siding', levels: 3, levelLabels: ['Brand', 'Line', 'Color'] },
-    { name: 'Fascia', levels: 3, levelLabels: ['Brand', 'Color', 'Size'] },
-    { name: 'Soffit', levels: 3, levelLabels: ['Brand', 'Color', 'Type'] },
-  ],
-  guttering: [],
-  windows: [],
-  small_jobs: [],
-}
-
 const SECTIONS = [
   { key: 'roof', label: 'Roof' },
   { key: 'siding', label: 'Siding' },
   { key: 'guttering', label: 'Guttering' },
   { key: 'windows', label: 'Windows' },
   { key: 'small_jobs', label: 'Small Jobs' },
+]
+
+const FIELD_TYPES = [
+  { value: 'cascade', label: 'Cascade (Brand/Line/Color)', icon: '🔗' },
+  { value: 'select', label: 'Dropdown', icon: '📋' },
+  { value: 'radio', label: 'Radio (Pick One)', icon: '🔘' },
+  { value: 'checkbox', label: 'Checkbox (Pick Multiple)', icon: '☑️' },
+  { value: 'count', label: 'Counter', icon: '#' },
+  { value: 'text', label: 'Text Input', icon: 'Aa' },
 ]
 
 type FilterMode = 'active' | 'inactive' | 'all'
@@ -68,54 +77,31 @@ export default function ProductsAdmin() {
   const [newOptionName, setNewOptionName] = useState('')
   const [newOptionParentId, setNewOptionParentId] = useState<string | null>(null)
   const [newOptionLevel, setNewOptionLevel] = useState(0)
+  const [newOptionNotes, setNewOptionNotes] = useState('')
   const [showNewOption, setShowNewOption] = useState(false)
+
+  // New field form
+  const [showNewField, setShowNewField] = useState(false)
+  const [newFieldName, setNewFieldName] = useState('')
+  const [newFieldKey, setNewFieldKey] = useState('')
+  const [newFieldType, setNewFieldType] = useState('text')
 
   const fetchCategories = useCallback(async () => {
     const res = await fetch('/api/products/categories')
     const data = await res.json()
-    setCategories(data)
+    setCategories(data || [])
     return data as Category[]
   }, [])
 
-  // On load: fetch categories and auto-create any missing predefined ones
   useEffect(() => {
-    async function init() {
-      const cats = await fetchCategories()
-      await ensureCategories(cats)
-      setLoading(false)
-    }
-    init()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  async function ensureCategories(existingCats: Category[]) {
-    let created = false
-    for (const [section, types] of Object.entries(SECTION_PRODUCT_TYPES)) {
-      for (let i = 0; i < types.length; i++) {
-        const type = types[i]
-        const exists = existingCats.some(
-          c => c.section === section && c.name.toLowerCase() === type.name.toLowerCase()
-        )
-        if (!exists) {
-          await fetch('/api/products/categories', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ section, name: type.name, sort_order: i }),
-          })
-          created = true
-        }
-      }
-    }
-    if (created) {
-      await fetchCategories()
-    }
-  }
+    fetchCategories().then(() => setLoading(false))
+  }, [fetchCategories])
 
   async function fetchOptions(categoryId: string) {
     setOptionsLoading(true)
     const res = await fetch(`/api/products/options?category_id=${categoryId}&all=true`)
     const data = await res.json()
-    setOptions(data)
+    setOptions(data || [])
     setOptionsLoading(false)
   }
 
@@ -129,15 +115,51 @@ export default function ProductsAdmin() {
         parent_id: newOptionParentId,
         level: newOptionLevel,
         name: newOptionName.trim(),
+        notes: newOptionNotes || null,
       }),
     })
     if (res.ok) {
       toast.success('Option added')
       setNewOptionName('')
+      setNewOptionNotes('')
       setShowNewOption(false)
       fetchOptions(selectedCategory.id)
     } else {
       toast.error('Failed to add option')
+    }
+  }
+
+  async function createField() {
+    if (!newFieldName.trim()) return
+    const fieldKey = newFieldKey.trim() || newFieldName.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+    const sectionCats = categories.filter(c => c.section === activeSection)
+    const maxSort = sectionCats.reduce((max, c) => Math.max(max, c.sort_order), -1) + 1
+
+    const cascadeLevels = newFieldType === 'cascade' ? 3 : 1
+    const levelLabels = newFieldType === 'cascade' ? ['Brand', 'Line', 'Color'] : null
+
+    const res = await fetch('/api/products/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        section: activeSection,
+        name: newFieldName.trim(),
+        field_key: fieldKey,
+        field_type: newFieldType,
+        cascade_levels: cascadeLevels,
+        level_labels: levelLabels,
+        sort_order: maxSort,
+      }),
+    })
+    if (res.ok) {
+      toast.success('Field added')
+      setNewFieldName('')
+      setNewFieldKey('')
+      setNewFieldType('text')
+      setShowNewField(false)
+      fetchCategories()
+    } else {
+      toast.error('Failed to add field')
     }
   }
 
@@ -153,6 +175,88 @@ export default function ProductsAdmin() {
     } else {
       toast.error('Failed to update')
     }
+  }
+
+  async function updateCategoryFieldType(cat: Category, newType: string) {
+    const updates: Record<string, unknown> = { field_type: newType }
+    // Auto-set cascade_levels for cascade type
+    if (newType === 'cascade' && cat.cascade_levels < 2) {
+      updates.cascade_levels = 3
+      updates.level_labels = ['Brand', 'Line', 'Color']
+    }
+    const res = await fetch(`/api/products/categories/${cat.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    })
+    if (res.ok) {
+      toast.success('Field type updated')
+      fetchCategories()
+      // Update selected if it's the same category
+      if (selectedCategory?.id === cat.id) {
+        const updated = await res.json()
+        setSelectedCategory(updated)
+      }
+    } else {
+      toast.error('Failed to update')
+    }
+  }
+
+  async function updateCategoryCascadeLevels(cat: Category, levels: number) {
+    const res = await fetch(`/api/products/categories/${cat.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cascade_levels: levels }),
+    })
+    if (res.ok) {
+      toast.success('Levels updated')
+      fetchCategories()
+      if (selectedCategory?.id === cat.id) {
+        const updated = await res.json()
+        setSelectedCategory(updated)
+      }
+    }
+  }
+
+  async function updateCategoryProperty(cat: Category, prop: string, value: unknown) {
+    const res = await fetch(`/api/products/categories/${cat.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [prop]: value }),
+    })
+    if (res.ok) {
+      fetchCategories()
+      if (selectedCategory?.id === cat.id) {
+        const updated = await res.json()
+        setSelectedCategory(updated)
+      }
+    }
+  }
+
+  async function moveCategorySort(cat: Category, direction: 'up' | 'down') {
+    const sectionCats = categories
+      .filter(c => c.section === activeSection)
+      .sort((a, b) => a.sort_order - b.sort_order)
+    const idx = sectionCats.findIndex(c => c.id === cat.id)
+    if (idx < 0) return
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= sectionCats.length) return
+
+    const other = sectionCats[swapIdx]
+    // Swap sort_order values
+    await Promise.all([
+      fetch(`/api/products/categories/${cat.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sort_order: other.sort_order }),
+      }),
+      fetch(`/api/products/categories/${other.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sort_order: cat.sort_order }),
+      }),
+    ])
+    fetchCategories()
   }
 
   async function toggleOptionActive(option: Option) {
@@ -173,29 +277,19 @@ export default function ProductsAdmin() {
     setShowNewOption(false)
   }
 
-  // Get product types for current section
-  const productTypes = SECTION_PRODUCT_TYPES[activeSection] || []
-
   // Filter categories for current section
-  const sectionCategories = categories.filter(c => c.section === activeSection)
+  const sectionCategories = categories
+    .filter(c => c.section === activeSection)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .filter(cat => {
+      if (filterMode === 'active') return cat.active
+      if (filterMode === 'inactive') return !cat.active
+      return true
+    })
 
-  // Match predefined types to existing categories
-  const productTypeItems = productTypes.map(pt => {
-    const cat = sectionCategories.find(c => c.name.toLowerCase() === pt.name.toLowerCase())
-    return { ...pt, category: cat }
-  }).filter(pt => {
-    if (!pt.category) return false
-    if (filterMode === 'active') return pt.category.active
-    if (filterMode === 'inactive') return !pt.category.active
-    return true
-  })
-
-  // Get the level labels for the selected category
-  const selectedType = productTypes.find(
-    pt => selectedCategory && pt.name.toLowerCase() === selectedCategory.name.toLowerCase()
-  )
-  const levelLabels = selectedType?.levelLabels || ['Brand / Type', 'Line / Model', 'Color / Variant']
-  const maxLevels = selectedType?.levels || 3
+  // Level labels for the selected category
+  const levelLabels: string[] = selectedCategory?.level_labels || ['Brand / Type', 'Line / Model', 'Color / Variant']
+  const maxLevels = selectedCategory?.cascade_levels || 3
 
   // Filter options by active status
   const filteredOptions = options.filter(o => {
@@ -207,6 +301,19 @@ export default function ProductsAdmin() {
   // Build tree from filtered options
   const rootOptions = filteredOptions.filter(o => !o.parent_id)
   const getChildren = (parentId: string) => filteredOptions.filter(o => o.parent_id === parentId)
+
+  // Field type badge
+  function FieldTypeBadge({ type }: { type: string }) {
+    const ft = FIELD_TYPES.find(f => f.value === type)
+    return (
+      <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 whitespace-nowrap">
+        {ft?.icon || '?'} {ft?.label?.split(' (')[0] || type}
+      </span>
+    )
+  }
+
+  // Determine if category needs product_options tree (cascade, select, radio, checkbox have options; count and text don't)
+  const needsOptions = selectedCategory && ['cascade', 'select', 'radio', 'checkbox'].includes(selectedCategory.field_type)
 
   return (
     <AppShell>
@@ -256,134 +363,322 @@ export default function ProductsAdmin() {
 
           {loading ? (
             <Loading message="Loading catalog..." />
-          ) : productTypes.length === 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-              <p className="text-gray-500">
-                {activeSection === 'guttering' ? 'Guttering' : activeSection === 'windows' ? 'Windows' : 'Small Jobs'} uses free-form entries on the production plan.
-              </p>
-              <p className="text-sm text-gray-400 mt-1">No product catalog needed for this section.</p>
-            </div>
           ) : (
             <div className="grid md:grid-cols-3 gap-6">
-              {/* Product types column */}
+              {/* Fields column */}
               <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <h2 className="font-semibold text-gray-900 mb-3">Product Types</h2>
-                {productTypeItems.length === 0 ? (
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-semibold text-gray-900">Fields</h2>
+                  <button
+                    onClick={() => setShowNewField(!showNewField)}
+                    className="text-primary hover:text-primary-dark text-sm font-medium"
+                  >
+                    + Add Field
+                  </button>
+                </div>
+
+                {/* New field form */}
+                {showNewField && (
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-2">
+                    <input
+                      type="text"
+                      value={newFieldName}
+                      onChange={e => {
+                        setNewFieldName(e.target.value)
+                        if (!newFieldKey) {
+                          // Auto-generate key from name
+                        }
+                      }}
+                      placeholder="Field name (e.g., Ridge Cap)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      autoFocus
+                    />
+                    <input
+                      type="text"
+                      value={newFieldKey}
+                      onChange={e => setNewFieldKey(e.target.value)}
+                      placeholder={`Key (auto: ${newFieldName.toLowerCase().replace(/[^a-z0-9]+/g, '_') || 'field_key'})`}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/50 text-gray-500"
+                    />
+                    <select
+                      value={newFieldType}
+                      onChange={e => setNewFieldType(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 bg-white"
+                    >
+                      {FIELD_TYPES.map(ft => (
+                        <option key={ft.value} value={ft.value}>{ft.icon} {ft.label}</option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={createField}
+                        className="px-3 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark"
+                      >
+                        Add
+                      </button>
+                      <button
+                        onClick={() => setShowNewField(false)}
+                        className="px-3 py-2 text-gray-500 hover:text-gray-700 text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {sectionCategories.length === 0 ? (
                   <p className="text-sm text-gray-400 py-4 text-center">
-                    {filterMode === 'inactive' ? 'No inactive product types' : 'Loading...'}
+                    {filterMode === 'inactive' ? 'No inactive fields' : 'No fields configured. Add one above.'}
                   </p>
                 ) : (
                   <div className="space-y-1">
-                    {productTypeItems.map(pt => (
+                    {sectionCategories.map((cat, idx) => (
                       <div
-                        key={pt.name}
-                        className={`flex items-center gap-2 rounded-lg transition-colors ${
-                          selectedCategory?.id === pt.category?.id
+                        key={cat.id}
+                        className={`rounded-lg transition-colors ${
+                          selectedCategory?.id === cat.id
                             ? 'bg-primary/10'
                             : 'hover:bg-gray-50'
-                        } ${pt.category && !pt.category.active ? 'opacity-50' : ''}`}
+                        } ${!cat.active ? 'opacity-50' : ''}`}
                       >
-                        <button
-                          onClick={() => pt.category && selectCategory(pt.category)}
-                          className={`flex-1 text-left px-3 py-2.5 text-sm ${
-                            selectedCategory?.id === pt.category?.id
-                              ? 'text-primary font-medium'
-                              : 'text-gray-700'
-                          }`}
-                        >
-                          {pt.name}
-                        </button>
-                        {pt.category && (
+                        <div className="flex items-center gap-1">
+                          {/* Sort arrows */}
+                          <div className="flex flex-col">
+                            <button
+                              onClick={() => moveCategorySort(cat, 'up')}
+                              disabled={idx === 0}
+                              className="text-gray-300 hover:text-gray-500 disabled:opacity-20 p-0.5"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => moveCategorySort(cat, 'down')}
+                              disabled={idx === sectionCategories.length - 1}
+                              className="text-gray-300 hover:text-gray-500 disabled:opacity-20 p-0.5"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                          </div>
+
                           <button
-                            onClick={(e) => { e.stopPropagation(); toggleCategoryActive(pt.category!) }}
-                            className={`text-xs px-2 py-0.5 rounded mr-2 shrink-0 ${
-                              pt.category.active
+                            onClick={() => selectCategory(cat)}
+                            className={`flex-1 text-left px-2 py-2 text-sm ${
+                              selectedCategory?.id === cat.id
+                                ? 'text-primary font-medium'
+                                : 'text-gray-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="truncate">{cat.name}</span>
+                              <FieldTypeBadge type={cat.field_type} />
+                            </div>
+                          </button>
+
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleCategoryActive(cat) }}
+                            className={`text-xs px-2 py-0.5 rounded mr-1 shrink-0 ${
+                              cat.active
                                 ? 'text-green-700 bg-green-50 hover:bg-green-100'
                                 : 'text-red-700 bg-red-50 hover:bg-red-100'
                             }`}
                           >
-                            {pt.category.active ? 'Active' : 'Inactive'}
+                            {cat.active ? 'Active' : 'Inactive'}
                           </button>
-                        )}
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Options tree (2 columns wide) */}
+              {/* Options/settings panel (2 columns wide) */}
               <div className="md:col-span-2 bg-white rounded-lg border border-gray-200 p-4">
                 {!selectedCategory ? (
-                  <p className="text-sm text-gray-400 py-8 text-center">Select a product type to manage options</p>
-                ) : optionsLoading ? (
-                  <Loading message="Loading options..." />
+                  <p className="text-sm text-gray-400 py-8 text-center">Select a field to manage its settings and options</p>
                 ) : (
                   <>
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="font-semibold text-gray-900">{selectedCategory.name}</h2>
-                      <button
-                        onClick={() => {
-                          setShowNewOption(true)
-                          setNewOptionParentId(null)
-                          setNewOptionLevel(0)
-                        }}
-                        className="text-primary hover:text-primary-dark text-sm font-medium"
-                      >
-                        + Add {levelLabels[0]}
-                      </button>
+                    {/* Field settings header */}
+                    <div className="mb-4 pb-4 border-b border-gray-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <h2 className="font-semibold text-gray-900">{selectedCategory.name}</h2>
+                        <span className="text-xs text-gray-400 font-mono">{selectedCategory.field_key}</span>
+                      </div>
+
+                      {/* Field type selector */}
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <label className="text-xs font-medium text-gray-500 w-full">Field Type:</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {FIELD_TYPES.map(ft => (
+                            <button
+                              key={ft.value}
+                              onClick={() => updateCategoryFieldType(selectedCategory, ft.value)}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                                selectedCategory.field_type === ft.value
+                                  ? 'bg-primary text-white border-primary'
+                                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              {ft.icon} {ft.label.split(' (')[0]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Cascade-specific settings */}
+                      {selectedCategory.field_type === 'cascade' && (
+                        <div className="flex items-center gap-3 mb-3">
+                          <label className="text-xs font-medium text-gray-500">Levels:</label>
+                          <div className="flex gap-1">
+                            {[1, 2, 3].map(n => (
+                              <button
+                                key={n}
+                                onClick={() => updateCategoryCascadeLevels(selectedCategory, n)}
+                                className={`w-8 h-8 rounded-lg text-xs font-medium border ${
+                                  selectedCategory.cascade_levels === n
+                                    ? 'bg-primary text-white border-primary'
+                                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                                }`}
+                              >
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Toggle properties */}
+                      <div className="flex flex-wrap gap-4">
+                        {(selectedCategory.field_type === 'select' || selectedCategory.field_type === 'text') && (
+                          <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedCategory.allow_custom}
+                              onChange={e => updateCategoryProperty(selectedCategory, 'allow_custom', e.target.checked)}
+                              className="rounded"
+                            />
+                            Allow custom entry
+                          </label>
+                        )}
+                        {selectedCategory.field_type === 'radio' && (
+                          <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedCategory.allow_deselect}
+                              onChange={e => updateCategoryProperty(selectedCategory, 'allow_deselect', e.target.checked)}
+                              className="rounded"
+                            />
+                            Allow deselect
+                          </label>
+                        )}
+                      </div>
                     </div>
 
-                    {showNewOption && (
-                      <div className="flex gap-2 mb-4 p-3 bg-gray-50 rounded-lg">
-                        <input
-                          type="text"
-                          value={newOptionName}
-                          onChange={e => setNewOptionName(e.target.value)}
-                          placeholder={`${levelLabels[newOptionLevel]} name`}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                          onKeyDown={e => e.key === 'Enter' && createOption()}
-                          autoFocus
-                        />
-                        <button
-                          onClick={createOption}
-                          className="px-3 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark"
-                        >
-                          Add
-                        </button>
-                        <button
-                          onClick={() => setShowNewOption(false)}
-                          className="px-3 py-2 text-gray-500 hover:text-gray-700 text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
+                    {/* Options tree - only for types that use product_options */}
+                    {needsOptions ? (
+                      optionsLoading ? (
+                        <Loading message="Loading options..." />
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-medium text-gray-700">Options</h3>
+                            <button
+                              onClick={() => {
+                                setShowNewOption(true)
+                                setNewOptionParentId(null)
+                                setNewOptionLevel(0)
+                                setNewOptionNotes('')
+                              }}
+                              className="text-primary hover:text-primary-dark text-sm font-medium"
+                            >
+                              + Add {levelLabels[0] || 'Option'}
+                            </button>
+                          </div>
 
-                    {rootOptions.length === 0 ? (
-                      <p className="text-sm text-gray-400 py-8 text-center">
-                        {filterMode === 'inactive'
-                          ? 'No inactive options'
-                          : `No options yet. Add a ${levelLabels[0]} to get started.`
-                        }
-                      </p>
+                          {showNewOption && (
+                            <div className="flex gap-2 mb-4 p-3 bg-gray-50 rounded-lg">
+                              <input
+                                type="text"
+                                value={newOptionName}
+                                onChange={e => setNewOptionName(e.target.value)}
+                                placeholder={`${levelLabels[newOptionLevel] || 'Option'} name`}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                onKeyDown={e => e.key === 'Enter' && createOption()}
+                                autoFocus
+                              />
+                              {/* Notes field for sub-field grouping */}
+                              {selectedCategory.config?.sub_fields && selectedCategory.config.sub_fields.length > 0 && (
+                                <select
+                                  value={newOptionNotes}
+                                  onChange={e => setNewOptionNotes(e.target.value)}
+                                  className="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                                >
+                                  <option value="">Main option</option>
+                                  {selectedCategory.config.sub_fields.map((sf) => (
+                                    <option key={sf.key} value={`sub:${sf.key}`}>{sf.label} option</option>
+                                  ))}
+                                </select>
+                              )}
+                              <button
+                                onClick={createOption}
+                                className="px-3 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-dark"
+                              >
+                                Add
+                              </button>
+                              <button
+                                onClick={() => setShowNewOption(false)}
+                                className="px-3 py-2 text-gray-500 hover:text-gray-700 text-sm"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+
+                          {rootOptions.length === 0 ? (
+                            <p className="text-sm text-gray-400 py-8 text-center">
+                              {filterMode === 'inactive'
+                                ? 'No inactive options'
+                                : `No options yet. Add a ${levelLabels[0] || 'option'} to get started.`
+                              }
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {rootOptions.map(opt => (
+                                <OptionNode
+                                  key={opt.id}
+                                  option={opt}
+                                  getChildren={getChildren}
+                                  onToggleActive={toggleOptionActive}
+                                  onAddChild={(parentId, level) => {
+                                    setNewOptionParentId(parentId)
+                                    setNewOptionLevel(level)
+                                    setShowNewOption(true)
+                                    setNewOptionName('')
+                                    setNewOptionNotes('')
+                                  }}
+                                  levelLabels={levelLabels}
+                                  maxLevels={maxLevels}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )
                     ) : (
-                      <div className="space-y-2">
-                        {rootOptions.map(opt => (
-                          <OptionNode
-                            key={opt.id}
-                            option={opt}
-                            getChildren={getChildren}
-                            onToggleActive={toggleOptionActive}
-                            onAddChild={(parentId, level) => {
-                              setNewOptionParentId(parentId)
-                              setNewOptionLevel(level)
-                              setShowNewOption(true)
-                              setNewOptionName('')
-                            }}
-                            levelLabels={levelLabels}
-                            maxLevels={maxLevels}
-                          />
-                        ))}
+                      <div className="py-8 text-center">
+                        <p className="text-sm text-gray-400">
+                          {selectedCategory.field_type === 'count'
+                            ? 'Counter fields don\'t need product options. Users enter a number directly.'
+                            : 'Text fields don\'t need product options. Users type freely.'}
+                        </p>
+                        {selectedCategory.config?.sub_fields && selectedCategory.config.sub_fields.length > 0 && (
+                          <p className="text-xs text-gray-400 mt-2">
+                            This field has sub-fields: {selectedCategory.config.sub_fields.map(sf => sf.label).join(', ')}
+                          </p>
+                        )}
                       </div>
                     )}
                   </>
@@ -410,7 +705,7 @@ function OptionNode({
   getChildren: (parentId: string) => Option[]
   onToggleActive: (opt: Option) => void
   onAddChild: (parentId: string, level: number) => void
-  levelLabels: [string, string, string]
+  levelLabels: string[]
   maxLevels: number
   depth?: number
 }) {
@@ -435,6 +730,12 @@ function OptionNode({
         <span className={`flex-1 text-sm ${depth === 0 ? 'font-medium' : ''}`}>
           {option.name}
         </span>
+
+        {option.notes && (
+          <span className="text-xs text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">
+            {option.notes}
+          </span>
+        )}
 
         <span className="text-xs text-gray-400 hidden group-hover:inline">
           {levelLabels[option.level] || ''}

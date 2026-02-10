@@ -7,11 +7,7 @@ import StepNavigation from '@/components/StepNavigation'
 import Loading from '@/components/Loading'
 import ClientInfoStep from '@/components/steps/ClientInfoStep'
 import SectionPickerStep from '@/components/steps/SectionPickerStep'
-import RoofSection from '@/components/sections/RoofSection'
-import SidingSection from '@/components/sections/SidingSection'
-import GutteringSection from '@/components/sections/GutteringSection'
-import WindowsSection from '@/components/sections/WindowsSection'
-import SmallJobsSection from '@/components/sections/SmallJobsSection'
+import DynamicSection from '@/components/sections/DynamicSection'
 import PricingSummary from '@/components/steps/PricingSummary'
 
 export default function EditPlan({ params }: { params: Promise<{ id: string }> }) {
@@ -53,6 +49,9 @@ function PlanEditor() {
 
   const currentStepKey = steps[currentStep]?.key
 
+  // Section keys that use DynamicSection
+  const sectionKeys = ['roof', 'siding', 'guttering', 'windows', 'small_jobs']
+
   function handleStepChange(step: number) {
     if (step >= 0 && step < steps.length) {
       setCurrentStep(step)
@@ -74,11 +73,9 @@ function PlanEditor() {
       <div className="p-4 sm:p-6 max-w-4xl mx-auto pb-24">
         {currentStepKey === 'client' && <ClientInfoStep />}
         {currentStepKey === 'sections' && <SectionPickerStep />}
-        {currentStepKey === 'roof' && <RoofSection />}
-        {currentStepKey === 'siding' && <SidingSection />}
-        {currentStepKey === 'guttering' && <GutteringSection />}
-        {currentStepKey === 'windows' && <WindowsSection />}
-        {currentStepKey === 'small_jobs' && <SmallJobsSection />}
+        {currentStepKey && sectionKeys.includes(currentStepKey) && (
+          <DynamicSection section={currentStepKey} />
+        )}
         {currentStepKey === 'pricing' && <PricingSummary />}
       </div>
     </div>

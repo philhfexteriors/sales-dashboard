@@ -30,25 +30,25 @@ export default function CascadeSelect({
   // Fetch brands (level 0)
   useEffect(() => {
     if (!categoryId) return
-    fetch(`/api/products/options?category_id=${categoryId}&parent_id=`)
+    fetch(`/api/products/options?category_id=${categoryId}&parent_id=&active=true`)
       .then(r => r.json())
-      .then(data => setBrands((data || []).filter((o: Option) => o.active)))
+      .then(data => setBrands(data || []))
   }, [categoryId])
 
   // Fetch lines when brand changes
   useEffect(() => {
     if (!value.brand_id) { setLines([]); return }
-    fetch(`/api/products/options?parent_id=${value.brand_id}`)
+    fetch(`/api/products/options?parent_id=${value.brand_id}&active=true`)
       .then(r => r.json())
-      .then(data => setLines((data || []).filter((o: Option) => o.active)))
+      .then(data => setLines(data || []))
   }, [value.brand_id])
 
   // Fetch colors when line changes
   useEffect(() => {
     if (!value.line_id || levels < 3) { setColors([]); return }
-    fetch(`/api/products/options?parent_id=${value.line_id}`)
+    fetch(`/api/products/options?parent_id=${value.line_id}&active=true`)
       .then(r => r.json())
-      .then(data => setColors((data || []).filter((o: Option) => o.active)))
+      .then(data => setColors(data || []))
   }, [value.line_id, levels])
 
   return (

@@ -35,10 +35,11 @@ export default function ManagedSelect({
     const params = new URLSearchParams()
     if (categoryId) params.set('category_id', categoryId)
     if (parentId) params.set('parent_id', parentId)
+    params.set('active', 'true')
 
     fetch(`/api/products/options?${params}`)
       .then(r => r.json())
-      .then(data => setOptions((data || []).filter((o: Option) => o.active)))
+      .then(data => setOptions(data || []))
   }, [categoryId, parentId])
 
   if (showCustom) {

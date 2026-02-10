@@ -35,6 +35,8 @@ const SECTIONS = [
 
 const LEVEL_LABELS = ['Brand / Type', 'Line / Model', 'Color / Variant']
 
+type FilterMode = 'active' | 'inactive' | 'all'
+
 export default function ProductsAdmin() {
   const [categories, setCategories] = useState<Category[]>([])
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
@@ -42,6 +44,7 @@ export default function ProductsAdmin() {
   const [loading, setLoading] = useState(true)
   const [optionsLoading, setOptionsLoading] = useState(false)
   const [activeSection, setActiveSection] = useState('roof')
+  const [filterMode, setFilterMode] = useState<FilterMode>('active')
 
   // New category form
   const [newCatName, setNewCatName] = useState('')
@@ -111,6 +114,20 @@ export default function ProductsAdmin() {
     }
   }
 
+  async function toggleCategoryActive(cat: Category) {
+    const res = await fetch(`/api/products/categories/${cat.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: !cat.active }),
+    })
+    if (res.ok) {
+      toast.success(cat.active ? 'Category deactivated' : 'Category activated')
+      fetchCategories()
+    } else {
+      toast.error('Failed to update category')
+    }
+  }
+
   async function toggleOptionActive(option: Option) {
     const res = await fetch(`/api/products/options/${option.id}`, {
       method: 'PUT',
@@ -118,7 +135,7 @@ export default function ProductsAdmin() {
       body: JSON.stringify({ active: !option.active }),
     })
     if (res.ok) {
-      toast.success(option.active ? 'Disabled' : 'Enabled')
+      toast.success(option.active ? 'Deactivated' : 'Activated')
       if (selectedCategory) fetchOptions(selectedCategory.id)
     }
   }
@@ -129,17 +146,53 @@ export default function ProductsAdmin() {
     setShowNewOption(false)
   }
 
-  const sectionCategories = categories.filter(c => c.section === activeSection)
+  // Filter categories by section and active status
+  const sectionCategories = categories.filter(c => {
+    if (c.section !== activeSection) return false
+    if (filterMode === 'active') return c.active
+    if (filterMode === 'inactive') return !c.active
+    return true
+  })
 
-  // Build tree from flat options
-  const rootOptions = options.filter(o => !o.parent_id)
-  const getChildren = (parentId: string) => options.filter(o => o.parent_id === parentId)
+  // Filter options by active status
+  const filteredOptions = options.filter(o => {
+    if (filterMode === 'active') return o.active
+    if (filterMode === 'inactive') return !o.active
+    return true
+  })
+
+  // Build tree from filtered options
+  const rootOptions = filteredOptions.filter(o => !o.parent_id)
+  const getChildren = (parentId: string) => filteredOptions.filter(o => o.parent_id === parentId)
 
   return (
     <AppShell>
       <RoleGuard allowedRoles={['admin', 'sales_manager']}>
         <div className="p-6 max-w-6xl mx-auto">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">Product Catalog</h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">Product Catalog</h1>
+
+            {/* Active/Inactive filter */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+              {([
+                { key: 'active', label: 'Active' },
+                { key: 'all', label: 'All' },
+                { key: 'inactive', label: 'Inactive' },
+              ] as { key: FilterMode; label: string }[]).map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setFilterMode(f.key)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    filterMode === f.key
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Section tabs */}
           <div className="flex gap-1 mb-6 overflow-x-auto pb-2">
@@ -194,21 +247,41 @@ export default function ProductsAdmin() {
                 )}
 
                 {sectionCategories.length === 0 ? (
-                  <p className="text-sm text-gray-400 py-4 text-center">No categories yet</p>
+                  <p className="text-sm text-gray-400 py-4 text-center">
+                    {filterMode === 'inactive' ? 'No inactive categories' : 'No categories yet'}
+                  </p>
                 ) : (
                   <div className="space-y-1">
                     {sectionCategories.map(cat => (
-                      <button
+                      <div
                         key={cat.id}
-                        onClick={() => selectCategory(cat)}
-                        className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                        className={`flex items-center gap-2 rounded-lg transition-colors ${
                           selectedCategory?.id === cat.id
-                            ? 'bg-primary/10 text-primary font-medium'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
+                            ? 'bg-primary/10'
+                            : 'hover:bg-gray-50'
+                        } ${!cat.active ? 'opacity-50' : ''}`}
                       >
-                        {cat.name}
-                      </button>
+                        <button
+                          onClick={() => selectCategory(cat)}
+                          className={`flex-1 text-left px-3 py-2.5 text-sm ${
+                            selectedCategory?.id === cat.id
+                              ? 'text-primary font-medium'
+                              : 'text-gray-700'
+                          }`}
+                        >
+                          {cat.name}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleCategoryActive(cat) }}
+                          className={`text-xs px-2 py-0.5 rounded mr-2 shrink-0 ${
+                            cat.active
+                              ? 'text-green-700 bg-green-50 hover:bg-green-100'
+                              : 'text-red-700 bg-red-50 hover:bg-red-100'
+                          }`}
+                        >
+                          {cat.active ? 'Active' : 'Inactive'}
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -263,7 +336,12 @@ export default function ProductsAdmin() {
                     )}
 
                     {rootOptions.length === 0 ? (
-                      <p className="text-sm text-gray-400 py-8 text-center">No options yet. Add a {LEVEL_LABELS[0]} to get started.</p>
+                      <p className="text-sm text-gray-400 py-8 text-center">
+                        {filterMode === 'inactive'
+                          ? 'No inactive options'
+                          : `No options yet. Add a ${LEVEL_LABELS[0]} to get started.`
+                        }
+                      </p>
                     ) : (
                       <div className="space-y-2">
                         {rootOptions.map(opt => (
@@ -349,7 +427,7 @@ function OptionNode({
               : 'text-red-700 bg-red-50 hover:bg-red-100'
           }`}
         >
-          {option.active ? 'Active' : 'Disabled'}
+          {option.active ? 'Active' : 'Inactive'}
         </button>
       </div>
 

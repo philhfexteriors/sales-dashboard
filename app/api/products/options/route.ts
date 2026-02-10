@@ -9,6 +9,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const categoryId = searchParams.get('category_id')
   const parentId = searchParams.get('parent_id')
+  const activeOnly = searchParams.get('active') === 'true'
 
   let query = supabase
     .from('product_options')
@@ -16,6 +17,7 @@ export async function GET(request: Request) {
     .order('sort_order')
     .order('name')
 
+  if (activeOnly) query = query.eq('active', true)
   if (categoryId) query = query.eq('category_id', categoryId)
   if (parentId) {
     query = query.eq('parent_id', parentId)

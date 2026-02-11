@@ -40,11 +40,11 @@ export interface ClientInfoValidation {
 
 export function useClientInfoValidation(plan: { client_name: string; client_address: string; client_city: string; client_state: string; client_zip: string; client_phone: string; client_email: string; is_retail: boolean; is_insurance: boolean; start_date_window_id: string | null }): ClientInfoValidation {
   const fields: { key: string; valid: boolean }[] = [
-    { key: 'client_name', valid: !!plan.client_name.trim() },
-    { key: 'client_address', valid: !!plan.client_address.trim() },
-    { key: 'client_city', valid: !!plan.client_city.trim() },
-    { key: 'client_state', valid: !!plan.client_state.trim() },
-    { key: 'client_zip', valid: !!plan.client_zip.trim() },
+    { key: 'client_name', valid: !!(plan.client_name || '').trim() },
+    { key: 'client_address', valid: !!(plan.client_address || '').trim() },
+    { key: 'client_city', valid: !!(plan.client_city || '').trim() },
+    { key: 'client_state', valid: !!(plan.client_state || '').trim() },
+    { key: 'client_zip', valid: !!(plan.client_zip || '').trim() },
     { key: 'client_phone', valid: isValidPhone(plan.client_phone) },
     { key: 'client_email', valid: isValidEmail(plan.client_email) },
     { key: 'sale_type', valid: plan.is_retail || plan.is_insurance },
@@ -155,13 +155,13 @@ export default function ClientInfoStep({ showErrors }: { showErrors?: boolean })
   const hasError = (field: string): boolean => {
     if (!showErrors) return false
     switch (field) {
-      case 'client_name': return !plan.client_name.trim()
-      case 'client_address': return !plan.client_address.trim()
-      case 'client_city': return !plan.client_city.trim()
-      case 'client_state': return !plan.client_state.trim()
-      case 'client_zip': return !plan.client_zip.trim()
-      case 'client_phone': return !isValidPhone(plan.client_phone)
-      case 'client_email': return !isValidEmail(plan.client_email)
+      case 'client_name': return !(plan.client_name || '').trim()
+      case 'client_address': return !(plan.client_address || '').trim()
+      case 'client_city': return !(plan.client_city || '').trim()
+      case 'client_state': return !(plan.client_state || '').trim()
+      case 'client_zip': return !(plan.client_zip || '').trim()
+      case 'client_phone': return !isValidPhone(plan.client_phone || '')
+      case 'client_email': return !isValidEmail(plan.client_email || '')
       case 'sale_type': return !plan.is_retail && !plan.is_insurance
       case 'start_date_window_id': return !plan.start_date_window_id
       default: return false
@@ -327,7 +327,7 @@ export default function ClientInfoStep({ showErrors }: { showErrors?: boolean })
           />
           {hasError('client_phone') && (
             <p className="text-xs text-red-500 mt-1">
-              {plan.client_phone.trim() ? 'Enter a valid phone number (10+ digits)' : 'Phone is required'}
+              {(plan.client_phone || '').trim() ? 'Enter a valid phone number (10+ digits)' : 'Phone is required'}
             </p>
           )}
         </div>
@@ -346,7 +346,7 @@ export default function ClientInfoStep({ showErrors }: { showErrors?: boolean })
           />
           {hasError('client_email') && (
             <p className="text-xs text-red-500 mt-1">
-              {plan.client_email.trim() ? 'Enter a valid email address' : 'Email is required'}
+              {(plan.client_email || '').trim() ? 'Enter a valid email address' : 'Email is required'}
             </p>
           )}
         </div>

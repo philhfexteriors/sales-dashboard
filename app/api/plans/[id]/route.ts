@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient()
@@ -42,6 +43,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   // Update plan fields if provided
   if (planUpdates) {
+    // If the plan is being signed, capture audit trail info server-side
+    if (planUpdates.status === 'signed') {
+      const headersList = await headers()
+      const forwardedFor = headersList.get('x-forwarded-for')
+      const realIp = headersList.get('x-real-ip')
+      const userAgent = headersList.get('user-agent')
+
+      planUpdates.signed_ip = forwardedFor?.split(',')[0]?.trim() || realIp || null
+      planUpdates.signed_user_agent = userAgent || null
+    }
+
     const { error } = await supabase
       .from('production_plans')
       .update(planUpdates)

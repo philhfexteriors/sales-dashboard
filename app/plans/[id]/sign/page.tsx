@@ -3,6 +3,7 @@
 import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/AppShell'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
 
 function useSignatureCanvas() {
@@ -86,6 +87,9 @@ export default function SignPlan({ params }: { params: Promise<{ id: string }> }
   const spSig = useSignatureCanvas()
   const [salespersonName, setSalespersonName] = useState('')
 
+  // E-consent checkbox
+  const [eConsentChecked, setEConsentChecked] = useState(false)
+
   // Editable date
   const [planDate, setPlanDate] = useState(() => {
     const now = new Date()
@@ -98,6 +102,13 @@ export default function SignPlan({ params }: { params: Promise<{ id: string }> }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const allValid =
+    clientSig.hasSignature &&
+    signedName.trim() !== '' &&
+    spSig.hasSignature &&
+    salespersonName.trim() !== '' &&
+    eConsentChecked
+
   async function handleComplete() {
     if (!clientSig.hasSignature || !signedName.trim()) {
       toast.error('Please have the client sign and enter their name')
@@ -105,6 +116,10 @@ export default function SignPlan({ params }: { params: Promise<{ id: string }> }
     }
     if (!spSig.hasSignature || !salespersonName.trim()) {
       toast.error('Please sign as salesperson and enter your name')
+      return
+    }
+    if (!eConsentChecked) {
+      toast.error('Please acknowledge the electronic signature consent')
       return
     }
 
@@ -137,15 +152,43 @@ export default function SignPlan({ params }: { params: Promise<{ id: string }> }
     }
   }
 
+  // Short plan ID for display
+  const shortId = id.slice(0, 8).toUpperCase()
+
   return (
     <AppShell>
       <div className="p-6 max-w-3xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Sign Production Plan</h1>
+        {/* Back to review */}
+        <Link
+          href={`/plans/${id}/review`}
+          className="inline-flex items-center gap-1 text-sm text-primary hover:text-primary-dark font-medium mb-4"
+        >
+          ← Back to Pricing & Review
+        </Link>
 
-        <div className="bg-gray-50 rounded-lg p-4 mb-6 text-sm text-gray-600">
-          I agree to the Production Plan and Pricing outlined above. I understand that all
-          supplemental invoices approved by my insurance carrier (if applicable) will affect
-          the Replacement Cost Value and Sale Price, but will not affect my out-of-pocket cost.
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-2xl font-bold text-gray-900">Sign Production Plan</h1>
+          <span className="text-xs font-mono text-gray-400">Plan #{shortId}</span>
+        </div>
+
+        {/* Legal agreement */}
+        <div className="bg-gray-50 rounded-lg p-4 mb-6 text-sm text-gray-700 space-y-3">
+          <p className="font-semibold text-gray-900">Agreement & Authorization</p>
+          <p>
+            By signing below, I confirm that I have reviewed the complete Production Plan
+            and Payment Terms for Plan #{shortId}, including all line items, pricing, and
+            scope of work described therein. I agree to the scope of work and pricing as
+            described in this Production Plan.
+          </p>
+          <p>
+            I understand that all supplemental invoices approved by my insurance carrier
+            (if applicable) will affect the Replacement Cost Value and Sale Price, but will
+            not affect my out-of-pocket cost.
+          </p>
+          <p>
+            I understand that I have the right to cancel this contract within three (3)
+            business days of signing, by providing written notice to the contractor.
+          </p>
         </div>
 
         {/* Client Signature */}
@@ -242,10 +285,33 @@ export default function SignPlan({ params }: { params: Promise<{ id: string }> }
           </div>
         </div>
 
+        {/* E-Consent Checkbox */}
+        <div className="mb-6 bg-gray-50 rounded-lg p-4">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={eConsentChecked}
+              onChange={e => setEConsentChecked(e.target.checked)}
+              className="mt-1 w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary/50 shrink-0"
+            />
+            <span className="text-sm text-gray-700">
+              I agree to sign this document electronically and acknowledge that my electronic
+              signature has the same legal effect, validity, and enforceability as a handwritten
+              signature under the federal ESIGN Act (15 U.S.C. &sect; 7001 et seq.) and applicable
+              state law. I confirm that I intend to be legally bound by this Production Plan.
+            </span>
+          </label>
+        </div>
+
+        {/* Timestamp display */}
+        <div className="text-xs text-gray-400 text-center mb-4">
+          Signing timestamp and device information will be recorded for verification purposes.
+        </div>
+
         {/* Complete Button */}
         <button
           onClick={handleComplete}
-          disabled={saving || !clientSig.hasSignature || !signedName.trim() || !spSig.hasSignature || !salespersonName.trim()}
+          disabled={saving || !allValid}
           className="w-full py-4 rounded-xl font-semibold bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? 'Saving...' : 'Complete & Send'}

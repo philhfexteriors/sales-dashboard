@@ -89,11 +89,10 @@ export default function SignPlan({ params }: { params: Promise<{ id: string }> }
   // Editable date
   const [planDate, setPlanDate] = useState(() => {
     const now = new Date()
-    return now.toISOString().split('T')[0] // YYYY-MM-DD
+    return now.toISOString().split('T')[0]
   })
 
   useEffect(() => {
-    // Initialize both canvases
     clientSig.initCanvas()
     spSig.initCanvas()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,17 +148,6 @@ export default function SignPlan({ params }: { params: Promise<{ id: string }> }
           the Replacement Cost Value and Sale Price, but will not affect my out-of-pocket cost.
         </div>
 
-        {/* Date */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-          <input
-            type="date"
-            value={planDate}
-            onChange={e => setPlanDate(e.target.value)}
-            className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-        </div>
-
         {/* Client Signature */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-3">Homeowner Signature</h2>
@@ -189,15 +177,27 @@ export default function SignPlan({ params }: { params: Promise<{ id: string }> }
             </button>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Homeowner Print Name</label>
-            <input
-              type="text"
-              value={signedName}
-              onChange={e => setSignedName(e.target.value)}
-              placeholder="Full name"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
+          {/* Name and Date side by side */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Homeowner Print Name</label>
+              <input
+                type="text"
+                value={signedName}
+                onChange={e => setSignedName(e.target.value)}
+                placeholder="Full name"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <input
+                type="date"
+                value={planDate}
+                onChange={e => setPlanDate(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+            </div>
           </div>
         </div>
 

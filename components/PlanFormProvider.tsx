@@ -36,6 +36,8 @@ export interface PlanData {
   shingle_initials_data: string | null
   start_date_window_id: string | null
   payment_notes: string | null
+  discount_value: number | null
+  discount_type: string | null
   approx_start_date?: string | null
 }
 
@@ -97,6 +99,8 @@ const defaultPlan: PlanData = {
   shingle_initials_data: null,
   start_date_window_id: null,
   payment_notes: null,
+  discount_value: null,
+  discount_type: null,
 }
 
 const PlanFormContext = createContext<PlanFormContextType>({
@@ -194,6 +198,8 @@ export function PlanFormProvider({
             out_of_pocket: plan.out_of_pocket,
             start_date_window_id: plan.start_date_window_id,
             payment_notes: plan.payment_notes,
+            discount_value: plan.discount_value,
+            discount_type: plan.discount_type,
             signature_data: plan.signature_data,
             signed_at: plan.signed_at,
             signed_by_name: plan.signed_by_name,

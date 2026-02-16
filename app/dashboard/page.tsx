@@ -7,6 +7,7 @@ import AppShell from '@/components/AppShell'
 import Loading from '@/components/Loading'
 import Link from 'next/link'
 import { format } from 'date-fns'
+import BidCard, { type BidSummary } from '@/components/BidCard'
 
 interface PlanSummary {
   id: string
@@ -28,12 +29,15 @@ interface PlanSummary {
 export default function Dashboard() {
   const { user } = useAuth()
   const [plans, setPlans] = useState<PlanSummary[]>([])
+  const [bids, setBids] = useState<BidSummary[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!user) return
 
     const supabase = createClient()
+
+    // Fetch plans
     supabase
       .from('production_plans')
       .select('id, status, client_name, client_address, sale_price, is_retail, is_insurance, has_roof, has_siding, has_guttering, has_windows, has_small_jobs, created_at, updated_at')
@@ -44,6 +48,12 @@ export default function Dashboard() {
         setPlans(data || [])
         setLoading(false)
       })
+
+    // Fetch recent bids
+    fetch('/api/bids?limit=5')
+      .then(r => r.json())
+      .then(data => setBids(Array.isArray(data) ? data : []))
+      .catch(() => {})
   }, [user])
 
   const drafts = plans.filter(p => p.status === 'draft')
@@ -116,6 +126,23 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Recent Bids Section */}
+        {bids.length > 0 && (
+          <div className="mt-10">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-gray-900">Recent Bids</h2>
+              <Link href="/bids" className="text-sm text-primary hover:underline">
+                View All Bids &rarr;
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {bids.map(bid => (
+                <BidCard key={bid.id} bid={bid} />
+              ))}
+            </div>
           </div>
         )}
       </div>

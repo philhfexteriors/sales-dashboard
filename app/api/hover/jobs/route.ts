@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
 
   const token = await getHoverAccessToken()
   if (!token) {
+    console.error('[hover/jobs] No valid token — getHoverAccessToken returned null')
     return NextResponse.json({ error: 'Hover not connected' }, { status: 503 })
   }
 

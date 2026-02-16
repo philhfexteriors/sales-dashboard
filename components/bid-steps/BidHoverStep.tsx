@@ -15,6 +15,7 @@ export default function BidHoverStep() {
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<HoverJob[]>([])
   const [loading, setLoading] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
   const [statusLoading, setStatusLoading] = useState(true)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -64,14 +65,23 @@ export default function BidHoverStep() {
 
   async function performSearch(query: string) {
     setLoading(true)
+    setSearchError(null)
     try {
       const res = await fetch(`/api/hover/jobs?search=${encodeURIComponent(query)}`)
       if (res.ok) {
         const data = await res.json()
         setResults(data.results || [])
+      } else if (res.status === 503) {
+        setSearchError('Hover connection lost. Try re-connecting your Hover account.')
+        setResults([])
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setSearchError(data.error || `Search failed (${res.status})`)
+        setResults([])
       }
     } catch {
-      // ignore
+      setSearchError('Network error — could not reach server.')
+      setResults([])
     }
     setLoading(false)
   }
@@ -220,7 +230,21 @@ export default function BidHoverStep() {
             </div>
           )}
 
-          {search.length >= 3 && !loading && results.length === 0 && (
+          {searchError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm">
+              <p className="text-red-800 font-medium">{searchError}</p>
+              {searchError.includes('connection lost') && (
+                <a
+                  href={`/api/hover/authorize?return_to=${encodeURIComponent(window.location.pathname)}`}
+                  className="inline-block mt-2 text-primary font-medium hover:text-primary-dark"
+                >
+                  Re-connect Hover Account
+                </a>
+              )}
+            </div>
+          )}
+
+          {search.length >= 3 && !loading && !searchError && results.length === 0 && (
             <p className="text-sm text-gray-500 py-4 text-center">
               No Hover jobs found. You can skip this step and enter measurements manually.
             </p>

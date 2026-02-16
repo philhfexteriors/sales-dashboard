@@ -17,7 +17,6 @@ interface TemplateItem {
   sort_order: number
   price_list: {
     id: string
-    item_code: string
     description: string
     unit: string
     unit_price: number
@@ -35,7 +34,6 @@ interface Template {
 
 interface PriceListItem {
   id: string
-  item_code: string
   description: string
   unit: string
   unit_price: number
@@ -330,7 +328,7 @@ export default function BidTemplatesAdmin() {
                                   </td>
                                   <td className="px-4 py-2 text-xs text-gray-500">
                                     {item.price_list
-                                      ? `${item.price_list.item_code} ($${item.price_list.unit_price}/${item.price_list.unit})`
+                                      ? `$${item.price_list.unit_price}/${item.price_list.unit}`
                                       : '—'}
                                   </td>
                                 </tr>

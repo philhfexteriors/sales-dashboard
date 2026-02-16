@@ -17,7 +17,7 @@ export async function GET(
       *,
       bid_template_items (
         *,
-        price_list (id, item_code, description, unit, unit_price)
+        price_list (id, description, unit, unit_price)
       )
     `)
     .eq('id', id)
@@ -88,7 +88,7 @@ export async function PUT(
   // Return updated template with items
   const { data: result } = await supabase
     .from('bid_templates')
-    .select(`*, bid_template_items (*, price_list (id, item_code, description, unit, unit_price))`)
+    .select(`*, bid_template_items (*, price_list (id, description, unit, unit_price))`)
     .eq('id', id)
     .single()
 

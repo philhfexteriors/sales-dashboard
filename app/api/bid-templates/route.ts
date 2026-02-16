@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       *,
       bid_template_items (
         *,
-        price_list (id, item_code, description, unit, unit_price)
+        price_list (id, description, unit, unit_price)
       )
     `)
     .order('trade')
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   // Return template with items
   const { data: result } = await supabase
     .from('bid_templates')
-    .select(`*, bid_template_items (*, price_list (id, item_code, description, unit, unit_price))`)
+    .select(`*, bid_template_items (*, price_list (id, description, unit, unit_price))`)
     .eq('id', template.id)
     .single()
 

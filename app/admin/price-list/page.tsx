@@ -20,7 +20,7 @@ interface PriceListItem {
   id: string
   trade: string
   section: string
-  item_code: string
+  item_code?: string | null
   brand: string | null
   description: string
   unit: string
@@ -75,7 +75,6 @@ export default function ProductCatalogAdmin() {
   // Add item form
   const [showAddForm, setShowAddForm] = useState(false)
   const [newItem, setNewItem] = useState({
-    item_code: '',
     brand: '',
     description: '',
     unit: 'EA',
@@ -229,8 +228,8 @@ export default function ProductCatalogAdmin() {
   }
 
   async function addItem() {
-    if (!newItem.item_code || !newItem.description) {
-      toast.error('Item code and description required')
+    if (!newItem.description) {
+      toast.error('Description is required')
       return
     }
     try {
@@ -247,7 +246,7 @@ export default function ProductCatalogAdmin() {
       if (res.ok) {
         toast.success('Item added')
         setShowAddForm(false)
-        setNewItem({ item_code: '', brand: '', description: '', unit: 'EA', unit_price: 0, section: 'materials', is_taxable: false, notes: '', category_id: null })
+        setNewItem({ brand: '', description: '', unit: 'EA', unit_price: 0, section: 'materials', is_taxable: false, notes: '', category_id: null })
         fetchItems()
       } else {
         const err = await res.json()
@@ -382,11 +381,7 @@ export default function ProductCatalogAdmin() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Brand</label>
-                  <input value={newItem.brand} onChange={e => setNewItem({ ...newItem, brand: e.target.value })} placeholder="e.g., OC, GAF" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Item Code</label>
-                  <input value={newItem.item_code} onChange={e => setNewItem({ ...newItem, item_code: e.target.value })} placeholder="e.g., ROOF-SHINGLES" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                  <input value={newItem.brand} onChange={e => setNewItem({ ...newItem, brand: e.target.value })} placeholder="e.g., CertainTeed, GAF, OC" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
@@ -657,9 +652,8 @@ function ItemSection({ title, items, categories, selectedCategoryId, ...props }:
             <thead>
               <tr className="bg-gray-50 text-left">
                 <th className="px-3 py-3 font-medium text-gray-500 w-8"></th>
-                <th className="px-3 py-3 font-medium text-gray-500">Brand / Code</th>
+                <th className="px-3 py-3 font-medium text-gray-500">Brand</th>
                 <th className="px-3 py-3 font-medium text-gray-500">Description</th>
-                <th className="px-3 py-3 font-medium text-gray-500">Category</th>
                 <th className="px-3 py-3 font-medium text-gray-500">Unit</th>
                 <th className="px-3 py-3 font-medium text-gray-500 text-right">Price</th>
                 <th className="px-3 py-3 font-medium text-gray-500 text-center">Tax</th>
@@ -709,7 +703,7 @@ function ItemRow({
     <>
       <tr className={`${!item.active ? 'opacity-50 bg-gray-50' : 'hover:bg-gray-50'}`}>
         <td className="px-3 py-3">
-          <button onClick={() => onToggleVariants(item.id)} className="text-gray-400 hover:text-gray-600" title="Variants">
+          <button onClick={() => onToggleVariants(item.id)} className="text-gray-400 hover:text-gray-600" title="Manage variants">
             <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
@@ -718,17 +712,10 @@ function ItemRow({
         {isEditing ? (
           <>
             <td className="px-3 py-2">
-              <input value={editData.brand || ''} onChange={e => onEditChange({ ...editData, brand: e.target.value || null })} placeholder="Brand" className="w-full px-2 py-1 border border-gray-300 rounded text-sm mb-1" />
-              <span className="font-mono text-[10px] text-gray-400">{item.item_code}</span>
+              <input value={editData.brand || ''} onChange={e => onEditChange({ ...editData, brand: e.target.value || null })} placeholder="Brand" className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
             </td>
             <td className="px-3 py-2">
               <input value={editData.description || ''} onChange={e => onEditChange({ ...editData, description: e.target.value })} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
-            </td>
-            <td className="px-3 py-2">
-              <select value={editData.category_id || ''} onChange={e => onEditChange({ ...editData, category_id: e.target.value || null })} className="px-2 py-1 border border-gray-300 rounded text-sm w-full">
-                <option value="">None</option>
-                {categories.filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
             </td>
             <td className="px-3 py-2">
               <select value={editData.unit || 'EA'} onChange={e => onEditChange({ ...editData, unit: e.target.value })} className="px-2 py-1 border border-gray-300 rounded text-sm">
@@ -749,18 +736,9 @@ function ItemRow({
         ) : (
           <>
             <td className="px-3 py-3">
-              {item.brand && <span className="font-medium text-gray-900">{item.brand}</span>}
-              {item.brand && <span className="text-gray-300 mx-1">·</span>}
-              <span className="font-mono text-xs text-gray-400">{item.item_code}</span>
+              {item.brand ? <span className="font-medium text-gray-900">{item.brand}</span> : <span className="text-xs text-gray-400">&mdash;</span>}
             </td>
             <td className="px-3 py-3 text-gray-900">{item.description}</td>
-            <td className="px-3 py-3">
-              {item.category ? (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{item.category.name}</span>
-              ) : (
-                <span className="text-xs text-gray-400">&mdash;</span>
-              )}
-            </td>
             <td className="px-3 py-3 text-gray-600">{item.unit}</td>
             <td className="px-3 py-3 text-right font-medium">${item.unit_price.toFixed(2)}</td>
             <td className="px-3 py-3 text-center">{item.is_taxable ? '✓' : ''}</td>
@@ -774,17 +752,41 @@ function ItemRow({
         )}
       </tr>
 
+      {/* Inline variant chips row — always shown if item has variant groups */}
+      {!isEditing && (() => {
+        const variantGroups = item.category?.variant_groups ?? ['color']
+        if (variantGroups.length === 0) return null
+        // Only show if expanded OR variants have been loaded for this item
+        const itemVariants = isExpanded ? variants : []
+        const activeCount = itemVariants.filter(v => v.active).length
+        const totalCount = itemVariants.length
+        if (!isExpanded) {
+          return (
+            <tr className={`${!item.active ? 'opacity-50' : ''}`}>
+              <td />
+              <td colSpan={6} className="px-3 pb-2 pt-0">
+                <button
+                  onClick={() => onToggleVariants(item.id)}
+                  className="text-xs text-gray-400 hover:text-primary transition-colors"
+                >
+                  {variantGroups.map(g => g.charAt(0).toUpperCase() + g.slice(1)).join(', ')} — click to manage
+                </button>
+              </td>
+            </tr>
+          )
+        }
+        return null
+      })()}
+
       {isExpanded && (
         <tr>
-          <td colSpan={8} className="bg-blue-50/50 px-6 py-3">
+          <td colSpan={7} className="bg-blue-50/50 px-6 py-3">
             {variantsLoading ? (
               <p className="text-xs text-gray-500">Loading variants...</p>
             ) : (
               <div>
                 {(() => {
-                  // Get variant groups from the item's category, or default to ['color']
                   const variantGroups = item.category?.variant_groups ?? ['color']
-                  // If category has no variant groups, show a message
                   if (variantGroups.length === 0) {
                     return (
                       <p className="text-xs text-gray-400 italic">This category has no variant attributes configured.</p>
@@ -796,15 +798,15 @@ function ItemRow({
                     return (
                       <div key={group} className="mb-3 last:mb-0">
                         <h4 className="text-xs font-semibold text-gray-700 mb-1.5 capitalize">
-                          {group} <span className="font-normal text-gray-400">({groupVariants.filter(v => v.active).length})</span>
+                          {group} <span className="font-normal text-gray-400">({groupVariants.filter(v => v.active).length} active, {groupVariants.length} total)</span>
                         </h4>
                         {groupVariants.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mb-2">
+                          <div className="flex flex-wrap gap-1.5 mb-2">
                             {groupVariants.map(v => (
-                              <span key={v.id} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border ${v.active ? 'bg-white border-gray-200 text-gray-700' : 'bg-gray-100 border-gray-200 text-gray-400 line-through'}`}>
+                              <span key={v.id} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${v.active ? 'bg-white border-gray-200 text-gray-700' : 'bg-gray-100 border-gray-200 text-gray-400 line-through'}`}>
                                 {v.name}
-                                <button onClick={() => onToggleVariantActive(v)} className={`ml-0.5 ${v.active ? 'text-gray-400 hover:text-red-500' : 'text-green-600'}`} title={v.active ? 'Deactivate' : 'Restore'}>
-                                  {v.active ? '×' : '↺'}
+                                <button onClick={() => onToggleVariantActive(v)} className={`ml-0.5 ${v.active ? 'text-gray-400 hover:text-amber-600' : 'text-green-600 hover:text-green-700'}`} title={v.active ? 'Mark unavailable' : 'Mark available'}>
+                                  {v.active ? '○' : '●'}
                                 </button>
                                 {!v.active && (
                                   <button onClick={() => onDeleteVariant(v)} className="text-red-400 hover:text-red-600 ml-0.5" title="Delete permanently">
@@ -820,7 +822,7 @@ function ItemRow({
                             value={inputValue}
                             onChange={e => onNewVariantNameChange(group, e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && onAddVariant(item.id, group)}
-                            placeholder={`Add ${group} (e.g., ${group === 'color' ? 'Weathered Wood' : group === 'size' ? '5"' : '...'})`}
+                            placeholder={`Add ${group}...`}
                             className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs flex-1 max-w-xs focus:ring-2 focus:ring-primary/20 focus:border-primary"
                           />
                           <button onClick={() => onAddVariant(item.id, group)} className="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-medium">Add</button>

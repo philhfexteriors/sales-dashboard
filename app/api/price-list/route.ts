@@ -37,12 +37,15 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   const { trade, section, item_code, brand, description, unit, unit_price, is_taxable, sort_order, notes, category_id } = body
 
+  // Auto-generate item_code if not provided (field is being deprecated)
+  const generatedCode = item_code || `${(trade || 'item').toUpperCase()}-${Date.now()}`
+
   const { data, error } = await supabase
     .from('price_list')
     .insert({
       trade,
       section,
-      item_code,
+      item_code: generatedCode,
       brand: brand || null,
       description,
       unit,

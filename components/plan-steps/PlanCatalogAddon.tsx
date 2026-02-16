@@ -7,7 +7,6 @@ import VariantSelect from '@/components/fields/VariantSelect'
 
 interface CatalogItem {
   id: string
-  item_code: string
   brand: string | null
   description: string
   unit: string
@@ -109,7 +108,6 @@ export default function PlanCatalogAddon({ section }: PlanCatalogAddonProps) {
     const q = search.toLowerCase()
     return (
       item.description.toLowerCase().includes(q) ||
-      item.item_code?.toLowerCase().includes(q) ||
       item.brand?.toLowerCase().includes(q) ||
       item.category?.name?.toLowerCase().includes(q)
     )
@@ -275,7 +273,7 @@ export default function PlanCatalogAddon({ section }: PlanCatalogAddonProps) {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{item.description}</p>
                           <p className="text-xs text-gray-400">
-                            {item.brand && `${item.brand} · `}{item.item_code} · {item.unit} · {item.section}
+                            {item.brand && `${item.brand} · `}{item.unit} · {item.section}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">

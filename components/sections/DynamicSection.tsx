@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import DynamicField, { type CategoryField } from '@/components/fields/DynamicField'
 import { CustomLineItems } from './SectionField'
+import PlanCatalogAddon from '@/components/plan-steps/PlanCatalogAddon'
 
 const SECTION_LABELS: Record<string, { title: string; description: string }> = {
   roof: { title: 'Roof', description: 'Configure all roofing details.' },
@@ -58,8 +59,12 @@ export default function DynamicSection({ section }: DynamicSectionProps) {
         ))
       )}
 
+      {/* Catalog add-ons */}
+      <h3 className="font-medium text-gray-700 mt-6">Catalog Add-Ons</h3>
+      <PlanCatalogAddon section={section} />
+
       {/* Custom line items always available at the bottom */}
-      <h3 className="font-medium text-gray-700 mt-6">Additional Items</h3>
+      <h3 className="font-medium text-gray-700 mt-4">Additional Items</h3>
       <CustomLineItems section={section} />
     </div>
   )

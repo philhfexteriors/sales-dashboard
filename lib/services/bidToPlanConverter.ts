@@ -66,12 +66,13 @@ export async function convertBidToPlan(
       unit: string
       line_total: number
       notes: string | null
+      price_list_id: string | null
     }> = []
 
     if (version) {
       const { data: items } = await supabase
         .from('bid_line_items')
-        .select('description, section, qty, unit, line_total, notes')
+        .select('description, section, qty, unit, line_total, notes, price_list_id')
         .eq('version_id', version.id)
         .order('section')
         .order('sort_order')
@@ -112,13 +113,14 @@ export async function convertBidToPlan(
       const planLineItems = lineItems.map((item, index) => ({
         plan_id: plan.id,
         section: planSection,
-        field_key: slugify(item.description),
+        field_key: item.price_list_id ? `${planSection}_catalog_${index + 1}` : slugify(item.description),
         sort_order: index,
         selections: null,
-        options: null,
+        options: item.price_list_id ? { qty: item.qty, unit_price: item.line_total / (item.qty || 1), unit: item.unit } : null,
         description: item.description,
         notes: item.notes,
         amount: item.line_total,
+        price_list_id: item.price_list_id || null,
       }))
 
       await supabase.from('plan_line_items').insert(planLineItems)

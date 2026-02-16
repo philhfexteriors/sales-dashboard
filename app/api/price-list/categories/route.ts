@@ -7,24 +7,18 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const trade = request.nextUrl.searchParams.get('trade')
-  const section = request.nextUrl.searchParams.get('section')
-  const categoryId = request.nextUrl.searchParams.get('category_id')
   const activeOnly = request.nextUrl.searchParams.get('active') !== 'false'
 
   let query = supabase
-    .from('price_list')
-    .select('*, category:price_list_categories(id, name)')
+    .from('price_list_categories')
+    .select('*')
     .order('trade')
-    .order('section')
     .order('sort_order')
 
   if (trade) query = query.eq('trade', trade)
-  if (section) query = query.eq('section', section)
-  if (categoryId) query = query.eq('category_id', categoryId)
   if (activeOnly) query = query.eq('active', true)
 
   const { data, error } = await query
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
@@ -35,21 +29,19 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { trade, section, item_code, description, unit, unit_price, is_taxable, sort_order, notes, category_id } = body
+  const { trade, name, description, sort_order } = body
+
+  if (!trade || !name) {
+    return NextResponse.json({ error: 'trade and name are required' }, { status: 400 })
+  }
 
   const { data, error } = await supabase
-    .from('price_list')
+    .from('price_list_categories')
     .insert({
       trade,
-      section,
-      item_code,
-      description,
-      unit,
-      unit_price: unit_price || 0,
-      is_taxable: is_taxable || false,
+      name,
+      description: description || null,
       sort_order: sort_order || 0,
-      notes: notes || null,
-      category_id: category_id || null,
     })
     .select()
     .single()

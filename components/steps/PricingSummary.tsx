@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { usePlanForm } from '@/components/PlanFormProvider'
 import CurrencyInput from '@/components/fields/CurrencyInput'
 import { CustomLineItems } from '@/components/sections/SectionField'
+import PlanCatalogAddon from '@/components/plan-steps/PlanCatalogAddon'
 import Link from 'next/link'
 
 interface PaymentNote { id: string; text: string; active: boolean }
@@ -130,7 +131,12 @@ export default function PricingSummary() {
         </div>
       ))}
 
-      {/* Misc Items */}
+      {/* Misc / Add-on Items */}
+      <div>
+        <h3 className="font-medium text-gray-700 mb-3">Catalog Add-Ons</h3>
+        <PlanCatalogAddon section="misc" />
+      </div>
+
       <div>
         <h3 className="font-medium text-gray-700 mb-3">Misc Items</h3>
         <CustomLineItems section="misc" />

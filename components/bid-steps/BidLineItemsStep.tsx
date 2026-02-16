@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useBidForm, calculateLineItemTotals, type BidLineItem } from '@/components/BidFormProvider'
+import CatalogPicker from '@/components/bid-steps/CatalogPicker'
 
 const UNITS = ['EA', 'SQ', 'PC', 'RL', 'BX', 'LF', 'SF', 'HR', 'BD', 'PR']
 
 export default function BidLineItemsStep() {
   const { bid, lineItems, updateLineItem, addLineItem, removeLineItem, calculateTotals } = useBidForm()
   const [activeSection, setActiveSection] = useState<'materials' | 'labor'>('materials')
+  const [showCatalog, setShowCatalog] = useState(false)
 
   // Recalculate totals when line items change
   useEffect(() => {
@@ -149,13 +151,33 @@ export default function BidLineItemsStep() {
         </p>
       )}
 
-      {/* Add item button */}
-      <button
-        onClick={() => addLineItem(activeSection)}
-        className="text-sm text-primary font-medium hover:text-primary-dark"
-      >
-        + Add {activeSection === 'materials' ? 'Material' : 'Labor'} Item
-      </button>
+      {/* Add item button + catalog picker */}
+      <div className="relative">
+        <button
+          onClick={() => setShowCatalog(true)}
+          className="text-sm text-primary font-medium hover:text-primary-dark"
+        >
+          + Add {activeSection === 'materials' ? 'Material' : 'Labor'} Item
+        </button>
+
+        {showCatalog && (
+          <CatalogPicker
+            trade={bid.trade}
+            section={activeSection}
+            onSelect={(item) => {
+              addLineItem(activeSection, {
+                price_list_id: item.price_list_id,
+                description: item.description,
+                unit: item.unit,
+                unit_price: item.unit_price,
+                is_taxable: item.is_taxable,
+              })
+            }}
+            onCustom={() => addLineItem(activeSection)}
+            onClose={() => setShowCatalog(false)}
+          />
+        )}
+      </div>
 
       {/* Section subtotals */}
       <div className="bg-gray-50 rounded-xl p-4 space-y-2">

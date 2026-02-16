@@ -32,8 +32,8 @@ export default function Navigation() {
   ]
 
   const adminItems = showAdmin ? [
-    { href: '/admin/products', label: 'Products', icon: BoxIcon },
-    { href: '/admin/price-list', label: 'Price List', icon: PriceIcon },
+    { href: '/admin/price-list', label: 'Product Catalog', icon: BoxIcon },
+    { href: '/admin/products', label: 'Plan Fields (Legacy)', icon: BoxIcon },
     { href: '/admin/bid-templates', label: 'Bid Templates', icon: TemplateIcon },
     { href: '/admin/tax-rates', label: 'Tax Rates', icon: PriceIcon },
     { href: '/admin/start-dates', label: 'Start Dates', icon: CalendarIcon },
@@ -136,7 +136,7 @@ export default function Navigation() {
           ))}
           {showAdmin && (
             <Link
-              href="/admin/products"
+              href="/admin/price-list"
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg ${
                 pathname.startsWith('/admin') ? 'text-primary' : 'text-gray-500'
               }`}

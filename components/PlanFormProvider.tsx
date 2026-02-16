@@ -52,6 +52,8 @@ export interface LineItem {
   description: string | null
   notes: string | null
   amount: number
+  price_list_id?: string | null
+  variant_id?: string | null
 }
 
 interface PlanFormContextType {
@@ -64,6 +66,7 @@ interface PlanFormContextType {
   updateLineItem: (fieldKey: string, section: string, updates: Partial<LineItem>) => void
   getLineItem: (fieldKey: string, section: string) => LineItem | undefined
   addCustomLineItem: (section: string, description?: string) => void
+  addCatalogLineItem: (section: string, item: { price_list_id: string; description: string; unit_price: number; unit: string }) => void
   removeLineItem: (fieldKey: string, section: string) => void
   saveNow: () => Promise<void>
   calculateTotals: () => void
@@ -113,6 +116,7 @@ const PlanFormContext = createContext<PlanFormContextType>({
   updateLineItem: () => {},
   getLineItem: () => undefined,
   addCustomLineItem: () => {},
+  addCatalogLineItem: () => {},
   removeLineItem: () => {},
   saveNow: async () => {},
   calculateTotals: () => {},
@@ -269,6 +273,24 @@ export function PlanFormProvider({
     setDirty(true)
   }, [])
 
+  const addCatalogLineItem = useCallback((section: string, item: { price_list_id: string; description: string; unit_price: number; unit: string }) => {
+    customCounterRef.current += 1
+    const fieldKey = `${section}_catalog_${customCounterRef.current}`
+    setLineItems(prev => [...prev, {
+      section,
+      field_key: fieldKey,
+      sort_order: prev.filter(li => li.section === section).length,
+      selections: null,
+      options: null,
+      description: item.description,
+      notes: null,
+      amount: item.unit_price,
+      price_list_id: item.price_list_id,
+    }])
+    setDirty(true)
+    return fieldKey
+  }, [])
+
   const removeLineItem = useCallback((fieldKey: string, section: string) => {
     setLineItems(prev => prev.filter(li => !(li.field_key === fieldKey && li.section === section)))
     setDirty(true)
@@ -299,7 +321,7 @@ export function PlanFormProvider({
     <PlanFormContext.Provider value={{
       plan, lineItems, loading, saving, dirty,
       updatePlan, updateLineItem, getLineItem,
-      addCustomLineItem, removeLineItem,
+      addCustomLineItem, addCatalogLineItem, removeLineItem,
       saveNow, calculateTotals,
     }}>
       {children}

@@ -132,9 +132,28 @@ function extractRoofData(measurements: HoverMeasurements): {
 } {
   // Hover sometimes includes roof data in the summary or as a top-level key
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const roof = (measurements as any).roof || (measurements as any).roof_summary
+  const m = measurements as any
+  const roof = m.roof || m.roof_summary
+
+  // Diagnostic: log top-level keys and roof structure to help debug
+  console.log('[extractRoofData] Top-level measurement keys:', Object.keys(measurements))
+  if (roof) {
+    console.log('[extractRoofData] Roof object type:', typeof roof)
+    if (typeof roof === 'object' && roof !== null) {
+      console.log('[extractRoofData] Roof keys:', Object.keys(roof))
+      for (const key of ['total_area', 'area', 'ridges', 'ridge_length', 'hips', 'hip_length', 'valleys', 'valley_length', 'rakes', 'rake_length', 'eaves', 'eave_length']) {
+        const val = roof[key]
+        if (val !== undefined) {
+          console.log(`[extractRoofData]   roof.${key}: type=${typeof val}, value=${typeof val === 'object' ? JSON.stringify(val).slice(0, 200) : val}`)
+        }
+      }
+    }
+  } else {
+    console.log('[extractRoofData] No roof or roof_summary key found')
+  }
+
   if (roof && typeof roof === 'object') {
-    return {
+    const result = {
       area: toNum(roof.total_area) || toNum(roof.area),
       ridges: toNum(roof.ridges) || toNum(roof.ridge_length),
       hips: toNum(roof.hips) || toNum(roof.hip_length),
@@ -142,8 +161,11 @@ function extractRoofData(measurements: HoverMeasurements): {
       rakes: toNum(roof.rakes) || toNum(roof.rake_length),
       eaves: toNum(roof.eaves) || toNum(roof.eave_length),
     }
+    console.log('[extractRoofData] Extracted result:', JSON.stringify(result))
+    return result
   }
 
+  console.log('[extractRoofData] Returning all zeros (no roof data)')
   return { area: 0, ridges: 0, hips: 0, valleys: 0, rakes: 0, eaves: 0 }
 }
 

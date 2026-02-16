@@ -28,6 +28,19 @@ export interface FormulaResult {
  *   {item:Some Description}     -> context.resolvedItems[description]
  *   {self:hardie}               -> 1 if materialVariant matches, 0 otherwise
  */
+/**
+ * Safely convert any value to a numeric string.
+ * Objects, arrays, nulls, NaN all become '0'.
+ */
+function safeNumStr(val: unknown): string {
+  if (typeof val === 'number' && isFinite(val)) return String(val)
+  if (typeof val === 'string') {
+    const p = parseFloat(val)
+    return isFinite(p) ? String(p) : '0'
+  }
+  return '0'
+}
+
 function resolveTokens(formula: string, context: FormulaContext): { expression: string; error: string | null } {
   let error: string | null = null
 
@@ -36,12 +49,12 @@ function resolveTokens(formula: string, context: FormulaContext): { expression: 
 
     // Special: waste factor
     if (trimmed === 'waste') {
-      return String(context.waste)
+      return safeNumStr(context.waste)
     }
 
     // Special: raw waste percentage
     if (trimmed === 'waste_pct') {
-      return String(context.wastePct)
+      return safeNumStr(context.wastePct)
     }
 
     // Item dependency: {item:Description}
@@ -52,7 +65,7 @@ function resolveTokens(formula: string, context: FormulaContext): { expression: 
         error = `Unknown item dependency: "${description}"`
         return '0'
       }
-      return String(value)
+      return safeNumStr(value)
     }
 
     // Material variant check: {self:hardie}, {self:vinyl}, etc.
@@ -67,7 +80,7 @@ function resolveTokens(formula: string, context: FormulaContext): { expression: 
       error = `Unknown variable: {${trimmed}}`
       return '0'
     }
-    return String(value)
+    return safeNumStr(value)
   })
 
   return { expression, error }
@@ -126,6 +139,16 @@ export function evaluateFormula(formula: string, context: FormulaContext): Formu
 
   // Step 1: Replace tokens with values
   const { expression, error: tokenError } = resolveTokens(formula, context)
+
+  // Diagnostic: log the resolved expression
+  console.log(`[evaluateFormula] "${formula}" => "${expression}"`)
+
+  // Safety check: if expression still contains '[object' it means an object leaked through
+  if (expression.includes('[object')) {
+    console.error(`[evaluateFormula] Object leaked into expression! Formula: "${formula}", Expression: "${expression}"`)
+    console.error(`[evaluateFormula] Context measurements:`, JSON.stringify(context.measurements))
+    return { value: 0, rawValue: 0, error: `Object leaked into expression (likely a Hover data structure issue). Raw: ${expression}` }
+  }
 
   // Step 2: Evaluate the math expression
   const { value: rawValue, error: evalError } = safeEval(expression)
@@ -199,13 +222,16 @@ export function validateFormula(formula: string): {
  */
 export function buildMeasurementContext(inputs: WasteCalcInputs): Record<string, number> {
   // Safely coerce all values to numbers — Hover data can sometimes
-  // contain objects or strings where we expect numbers
+  // contain objects or strings where we expect numbers.
+  // Uses the same logic as safeNumStr but returns a number.
   function n(val: unknown): number {
     if (typeof val === 'number' && isFinite(val)) return val
     if (typeof val === 'string') { const p = parseFloat(val); return isFinite(p) ? p : 0 }
+    // Objects, arrays, null, undefined, booleans all become 0
     return 0
   }
-  return {
+
+  const ctx: Record<string, number> = {
     area: n(inputs.area),
     ridges: n(inputs.ridges),
     hips: n(inputs.hips),
@@ -231,6 +257,18 @@ export function buildMeasurementContext(inputs: WasteCalcInputs): Record<string,
     blockCount: n(inputs.blockCount),
     porchSoffit: n(inputs.porchSoffit),
   }
+
+  // Validate: log warning if any value snuck through as non-number
+  if (typeof window !== 'undefined') {
+    for (const [key, val] of Object.entries(ctx)) {
+      if (typeof val !== 'number' || !isFinite(val)) {
+        console.error(`[buildMeasurementContext] Non-number in context: ${key} = ${typeof val} ${val}`)
+        ctx[key] = 0
+      }
+    }
+  }
+
+  return ctx
 }
 
 /**

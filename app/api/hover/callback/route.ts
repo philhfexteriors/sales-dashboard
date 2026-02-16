@@ -55,5 +55,9 @@ export async function GET(request: NextRequest) {
       })
   }
 
-  return NextResponse.redirect(new URL('/bids?hover=connected', request.nextUrl.origin))
+  // Redirect back to where the user came from (bid edit page)
+  const returnTo = request.nextUrl.searchParams.get('state') || '/bids'
+  const redirectUrl = new URL(returnTo, request.nextUrl.origin)
+  redirectUrl.searchParams.set('hover', 'connected')
+  return NextResponse.redirect(redirectUrl)
 }

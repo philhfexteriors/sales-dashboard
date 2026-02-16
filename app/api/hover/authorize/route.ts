@@ -14,10 +14,14 @@ export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin
   const redirectUri = `${origin}/api/hover/callback`
 
+  // Pass return URL through OAuth state so callback can redirect back
+  const returnTo = request.nextUrl.searchParams.get('return_to') || '/bids'
+
   const authUrl = new URL('https://hover.to/oauth/authorize')
   authUrl.searchParams.set('response_type', 'code')
   authUrl.searchParams.set('client_id', clientId)
   authUrl.searchParams.set('redirect_uri', redirectUri)
+  authUrl.searchParams.set('state', returnTo)
 
   return NextResponse.redirect(authUrl.toString())
 }

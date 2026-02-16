@@ -124,7 +124,7 @@ export default function BidHoverStep() {
         <h2 className="text-xl font-semibold text-gray-900">Connect Hover</h2>
         <p className="text-sm text-gray-500">Connect your Hover account to pull measurement data.</p>
         <a
-          href="/api/hover/authorize"
+          href={`/api/hover/authorize?return_to=${encodeURIComponent(window.location.pathname)}`}
           className="inline-block px-6 py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary-dark transition-colors"
         >
           Connect Hover Account

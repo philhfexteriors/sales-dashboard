@@ -17,7 +17,7 @@ export async function GET(
       *,
       bid_template_items (
         *,
-        price_list (id, description, unit, unit_price)
+        price_list (id, description, unit, unit_price, is_taxable)
       )
     `)
     .eq('id', id)
@@ -39,11 +39,12 @@ export async function PUT(
   const body = await request.json()
   const { name, description, active, items } = body
 
-  // Update template
+  // Update template fields
   const updateData: Record<string, unknown> = {}
   if (name !== undefined) updateData.name = name
   if (description !== undefined) updateData.description = description
   if (active !== undefined) updateData.active = active
+  if (body.waste_pct !== undefined) updateData.waste_pct = body.waste_pct
 
   if (Object.keys(updateData).length > 0) {
     const { error } = await supabase
@@ -54,17 +55,23 @@ export async function PUT(
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Replace items if provided
+  // Upsert items if provided (preserves UUIDs for depends_on_item_id references)
   if (items !== undefined) {
-    // Delete existing items
-    await supabase
+    // Get existing item IDs
+    const { data: existingItems } = await supabase
       .from('bid_template_items')
-      .delete()
+      .select('id')
       .eq('template_id', id)
 
-    // Insert new items
-    if (items.length > 0) {
-      const templateItems = items.map((item: Record<string, unknown>, index: number) => ({
+    const existingIds = new Set((existingItems || []).map((i: { id: string }) => i.id))
+    const incomingIds = new Set<string>()
+
+    const toInsert: Record<string, unknown>[] = []
+    const toUpdate: { id: string; data: Record<string, unknown> }[] = []
+
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index] as Record<string, unknown>
+      const itemData = {
         template_id: id,
         price_list_id: item.price_list_id || null,
         section: item.section,
@@ -74,21 +81,52 @@ export async function PUT(
         default_qty: item.default_qty || null,
         sort_order: item.sort_order ?? index,
         is_required: item.is_required ?? true,
+        measurement_key: item.measurement_key || null,
+        depends_on_item_id: item.depends_on_item_id || null,
         notes: item.notes || null,
-      }))
+      }
 
-      const { error: itemsError } = await supabase
+      if (item.id && existingIds.has(item.id as string)) {
+        // Update existing item
+        incomingIds.add(item.id as string)
+        toUpdate.push({ id: item.id as string, data: itemData })
+      } else {
+        // Insert new item
+        toInsert.push(itemData)
+      }
+    }
+
+    // Delete items not in incoming list
+    const toDelete = [...existingIds].filter(id => !incomingIds.has(id))
+    if (toDelete.length > 0) {
+      await supabase
         .from('bid_template_items')
-        .insert(templateItems)
+        .delete()
+        .in('id', toDelete)
+    }
 
-      if (itemsError) return NextResponse.json({ error: itemsError.message }, { status: 500 })
+    // Update existing items
+    for (const { id: itemId, data } of toUpdate) {
+      await supabase
+        .from('bid_template_items')
+        .update(data)
+        .eq('id', itemId)
+    }
+
+    // Insert new items
+    if (toInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from('bid_template_items')
+        .insert(toInsert)
+
+      if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
     }
   }
 
   // Return updated template with items
   const { data: result } = await supabase
     .from('bid_templates')
-    .select(`*, bid_template_items (*, price_list (id, description, unit, unit_price))`)
+    .select(`*, bid_template_items (*, price_list (id, description, unit, unit_price, is_taxable))`)
     .eq('id', id)
     .single()
 

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       *,
       bid_template_items (
         *,
-        price_list (id, description, unit, unit_price)
+        price_list (id, description, unit, unit_price, is_taxable)
       )
     `)
     .order('trade')
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   // Create template
   const { data: template, error: templateError } = await supabase
     .from('bid_templates')
-    .insert({ trade, name, description: description || null })
+    .insert({ trade, name, description: description || null, waste_pct: body.waste_pct ?? 10 })
     .select()
     .single()
 
@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       default_qty: item.default_qty || null,
       sort_order: item.sort_order ?? index,
       is_required: item.is_required ?? true,
+      measurement_key: item.measurement_key || null,
       notes: item.notes || null,
     }))
 
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
   // Return template with items
   const { data: result } = await supabase
     .from('bid_templates')
-    .select(`*, bid_template_items (*, price_list (id, description, unit, unit_price))`)
+    .select(`*, bid_template_items (*, price_list (id, description, unit, unit_price, is_taxable))`)
     .eq('id', template.id)
     .single()
 

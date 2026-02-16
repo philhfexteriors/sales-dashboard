@@ -1,17 +1,32 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useBidForm } from '@/components/BidFormProvider'
 import { parseFacadeData, parseHoverWindows } from '@/lib/services/hoverTypes'
 import type { HoverMeasurements } from '@/lib/services/hoverTypes'
+import { applyTemplate, type TemplateData } from '@/lib/services/templateApplicator'
 import toast from 'react-hot-toast'
 
 export default function BidMeasurementsStep() {
-  const { bid, updateBid } = useBidForm()
+  const { bid, updateBid, setLineItems } = useBidForm()
   const [loading, setLoading] = useState(false)
   const [measurements, setMeasurements] = useState<HoverMeasurements | null>(
     bid.measurements_json as HoverMeasurements | null
   )
+  const [templateData, setTemplateData] = useState<TemplateData | null>(null)
+  const [applyingTemplate, setApplyingTemplate] = useState(false)
+
+  // Fetch full template when template_id is set
+  useEffect(() => {
+    if (!bid.template_id) {
+      setTemplateData(null)
+      return
+    }
+    fetch(`/api/bid-templates/${bid.template_id}`)
+      .then(r => r.json())
+      .then(data => setTemplateData(data))
+      .catch(() => setTemplateData(null))
+  }, [bid.template_id])
 
   async function fetchMeasurements() {
     if (!bid.hover_model_id) {
@@ -119,10 +134,73 @@ export default function BidMeasurementsStep() {
             These measurements will be used to auto-calculate bid quantities in the next step.
             You can always adjust quantities manually.
           </p>
+
+          {/* Apply Template card */}
+          {templateData && (
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h4 className="font-medium text-gray-900">
+                    Template: {templateData.name}
+                  </h4>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {templateData.bid_template_items.length} items will be auto-calculated from measurements
+                    with {getWastePct()}% waste factor
+                  </p>
+                </div>
+                <button
+                  onClick={handleApplyTemplate}
+                  disabled={applyingTemplate}
+                  className="px-5 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 shrink-0"
+                >
+                  {applyingTemplate ? 'Applying...' : 'Apply Template & Calculate'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                This will replace any existing line items with template-calculated quantities.
+              </p>
+            </div>
+          )}
+
+          {/* No template but measurements available */}
+          {!templateData && bid.template_id === null && (
+            <p className="text-xs text-gray-400">
+              No template selected. You can select a template in the Trade step to auto-calculate quantities.
+            </p>
+          )}
         </div>
       )}
     </div>
   )
+
+  function getWastePct(): number {
+    if (bid.trade === 'roof') return bid.waste_pct_roof
+    if (bid.trade === 'siding' || bid.trade === 'fascia_soffit') return bid.waste_pct_siding
+    return templateData?.waste_pct ?? 10
+  }
+
+  function handleApplyTemplate() {
+    if (!templateData) return
+    setApplyingTemplate(true)
+    try {
+      const wastePct = getWastePct()
+      const lineItems = applyTemplate(
+        templateData,
+        measurements,
+        {
+          wastePct,
+          defaultMarginPct: bid.default_margin_pct,
+          materialVariant: bid.material_variant,
+        }
+      )
+      setLineItems(lineItems)
+      toast.success(`Template applied — ${lineItems.length} items calculated`)
+    } catch (err) {
+      console.error('Template application error:', err)
+      toast.error('Failed to apply template')
+    }
+    setApplyingTemplate(false)
+  }
 }
 
 function RoofMeasurements({ measurements }: { measurements: HoverMeasurements }) {

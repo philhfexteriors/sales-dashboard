@@ -61,6 +61,7 @@ export interface BidLineItem {
   notes: string | null
   qty_source: 'hover' | 'manual' | 'formula' | null
   qty_formula: string | null
+  template_item_id?: string | null
 }
 
 interface BidFormContextType {
@@ -132,8 +133,12 @@ const BidFormContext = createContext<BidFormContextType>({
 
 export function calculateLineItemTotals(item: BidLineItem): BidLineItem {
   const total_price = Math.round(item.qty * item.unit_price * 100) / 100
-  const total_margin = Math.round(total_price * item.margin_pct / 100 * 100) / 100
-  const line_total = Math.round((total_price + total_margin) * 100) / 100
+  // True margin: selling_price = cost / (1 - margin%), margin_amount = selling_price - cost
+  const marginFraction = Math.min(item.margin_pct / 100, 0.99) // cap at 99% to avoid division by zero
+  const line_total = marginFraction > 0
+    ? Math.round(total_price / (1 - marginFraction) * 100) / 100
+    : total_price
+  const total_margin = Math.round((line_total - total_price) * 100) / 100
   return { ...item, total_price, total_margin, line_total }
 }
 

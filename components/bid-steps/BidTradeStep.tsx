@@ -1,6 +1,15 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useBidForm } from '@/components/BidFormProvider'
+
+interface TemplateSummary {
+  id: string
+  name: string
+  description: string | null
+  waste_pct: number
+  bid_template_items: { id: string; description: string }[]
+}
 
 const TRADES = [
   { key: 'roof', label: 'Roofing', desc: 'Shingles, underlayment, ridge caps, flashing' },
@@ -30,9 +39,37 @@ const ROOF_COMPLEXITY = [
 
 export default function BidTradeStep() {
   const { bid, updateBid } = useBidForm()
+  const [templates, setTemplates] = useState<TemplateSummary[]>([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
 
   const showSidingOptions = bid.trade === 'siding' || bid.trade === 'fascia_soffit'
   const showRoofOptions = bid.trade === 'roof'
+
+  // Fetch templates when trade changes
+  useEffect(() => {
+    if (!bid.trade) return
+    setLoadingTemplates(true)
+    fetch(`/api/bid-templates?trade=${bid.trade}`)
+      .then(r => r.json())
+      .then(data => setTemplates(Array.isArray(data) ? data : []))
+      .catch(() => setTemplates([]))
+      .finally(() => setLoadingTemplates(false))
+  }, [bid.trade])
+
+  const selectedTemplate = templates.find(t => t.id === bid.template_id) || null
+
+  const handleTemplateChange = (templateId: string | null) => {
+    updateBid({ template_id: templateId })
+    // Optionally pre-fill waste % from template
+    if (templateId) {
+      const tmpl = templates.find(t => t.id === templateId)
+      if (tmpl) {
+        if (bid.trade === 'roof') updateBid({ template_id: templateId, waste_pct_roof: tmpl.waste_pct })
+        else if (bid.trade === 'siding' || bid.trade === 'fascia_soffit') updateBid({ template_id: templateId, waste_pct_siding: tmpl.waste_pct })
+        else updateBid({ template_id: templateId })
+      }
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -48,7 +85,7 @@ export default function BidTradeStep() {
           {TRADES.map(trade => (
             <button
               key={trade.key}
-              onClick={() => updateBid({ trade: trade.key })}
+              onClick={() => updateBid({ trade: trade.key, template_id: null })}
               className={`text-left p-4 rounded-xl border-2 transition-all ${
                 bid.trade === trade.key
                   ? 'border-primary bg-primary/5'
@@ -61,6 +98,33 @@ export default function BidTradeStep() {
           ))}
         </div>
       </div>
+
+      {/* Bid Template selector */}
+      {templates.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Bid Template (optional)</label>
+          <select
+            value={bid.template_id || ''}
+            onChange={e => handleTemplateChange(e.target.value || null)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm"
+          >
+            <option value="">No template — manual bid</option>
+            {templates.map(t => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.bid_template_items.length} items, {t.waste_pct}% waste)
+              </option>
+            ))}
+          </select>
+          {selectedTemplate && (
+            <p className="text-xs text-gray-400 mt-1.5">
+              Template will auto-calculate quantities from Hover measurements in the Line Items step.
+            </p>
+          )}
+          {loadingTemplates && (
+            <p className="text-xs text-gray-400 mt-1">Loading templates...</p>
+          )}
+        </div>
+      )}
 
       {/* Material variant (siding/fascia) */}
       {showSidingOptions && (

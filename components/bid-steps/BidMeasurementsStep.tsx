@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useBidForm } from '@/components/BidFormProvider'
 import { parseFacadeData, parseHoverWindows } from '@/lib/services/hoverTypes'
 import type { HoverMeasurements } from '@/lib/services/hoverTypes'
+import { extractWasteCalcInputs } from '@/lib/services/measurementMapper'
 import { applyTemplate, type TemplateData } from '@/lib/services/templateApplicator'
 import toast from 'react-hot-toast'
 
@@ -204,32 +205,39 @@ export default function BidMeasurementsStep() {
 }
 
 function RoofMeasurements({ measurements }: { measurements: HoverMeasurements }) {
-  // Extract roof data if available (from roof key or summary)
-  const roofData = measurements.roof as Record<string, unknown> | undefined
+  // Use the same extraction logic as the formula system for consistency
+  const inputs = extractWasteCalcInputs(measurements)
+  const hasRoofData = inputs.area > 0 || inputs.ridges > 0 || inputs.rakes > 0 || inputs.eaves > 0
 
   return (
     <div className="space-y-3">
-      {roofData ? (
+      {hasRoofData ? (
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <h4 className="text-sm font-medium text-gray-700 mb-3">Roof Measurements</h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-            {roofData.total_area != null && (
-              <MeasurementValue label="Total Area" value={`${Math.round(roofData.total_area as number)} sq ft`} />
+            {inputs.area > 0 && (
+              <MeasurementValue label="Total Area" value={`${Math.round(inputs.area)} sq ft`} />
             )}
-            {roofData.ridges != null && (
-              <MeasurementValue label="Ridges" value={`${Math.round(roofData.ridges as number)} ft`} />
+            {inputs.ridges > 0 && (
+              <MeasurementValue label="Ridges" value={`${Math.round(inputs.ridges)} ft`} />
             )}
-            {roofData.hips != null && (
-              <MeasurementValue label="Hips" value={`${Math.round(roofData.hips as number)} ft`} />
+            {inputs.hips > 0 && (
+              <MeasurementValue label="Hips" value={`${Math.round(inputs.hips)} ft`} />
             )}
-            {roofData.valleys != null && (
-              <MeasurementValue label="Valleys" value={`${Math.round(roofData.valleys as number)} ft`} />
+            {inputs.valleys > 0 && (
+              <MeasurementValue label="Valleys" value={`${Math.round(inputs.valleys)} ft`} />
             )}
-            {roofData.rakes != null && (
-              <MeasurementValue label="Rakes" value={`${Math.round(roofData.rakes as number)} ft`} />
+            {inputs.rakes > 0 && (
+              <MeasurementValue label="Rakes" value={`${Math.round(inputs.rakes)} ft`} />
             )}
-            {roofData.eaves != null && (
-              <MeasurementValue label="Eaves" value={`${Math.round(roofData.eaves as number)} ft`} />
+            {inputs.eaves > 0 && (
+              <MeasurementValue label="Eaves" value={`${Math.round(inputs.eaves)} ft`} />
+            )}
+            {inputs.flashing > 0 && (
+              <MeasurementValue label="Flashing" value={`${Math.round(inputs.flashing)} ft`} />
+            )}
+            {inputs.stepFlashing > 0 && (
+              <MeasurementValue label="Step Flashing" value={`${Math.round(inputs.stepFlashing)} ft`} />
             )}
           </div>
         </div>
@@ -289,16 +297,16 @@ function SidingMeasurements({ measurements }: { measurements: HoverMeasurements 
 }
 
 function GutterMeasurements({ measurements }: { measurements: HoverMeasurements }) {
-  // Gutter data comes from eaves in roof measurements
-  const roofData = measurements.roof as Record<string, unknown> | undefined
+  // Use same extraction logic as formula system
+  const inputs = extractWasteCalcInputs(measurements)
 
   return (
     <div className="space-y-3">
-      {roofData?.eaves != null ? (
+      {inputs.eaves > 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <h4 className="text-sm font-medium text-gray-700 mb-3">Gutter Measurements</h4>
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <MeasurementValue label="Eaves (Gutter Run)" value={`${Math.round(roofData.eaves as number)} ft`} />
+            <MeasurementValue label="Eaves (Gutter Run)" value={`${Math.round(inputs.eaves)} ft`} />
           </div>
         </div>
       ) : (

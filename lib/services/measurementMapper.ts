@@ -73,6 +73,13 @@ export function extractWasteCalcInputs(measurements: HoverMeasurements): WasteCa
   // Extract roof data if available (Hover may include this in summary or separate keys)
   const roofData = extractRoofData(measurements)
 
+  // Extract flashing/step flashing from Hover roof.measurements if available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hoverRoof = (measurements as any).roof
+  const hoverRoofMeas = hoverRoof?.measurements && typeof hoverRoof.measurements === 'object' ? hoverRoof.measurements : hoverRoof
+  const flashing = hoverRoofMeas ? toNum(hoverRoofMeas.flashing) : 0
+  const stepFlashing = hoverRoofMeas ? toNum(hoverRoofMeas.step_flashing) : 0
+
   return {
     // Roofing
     area: roofData.area,
@@ -81,8 +88,8 @@ export function extractWasteCalcInputs(measurements: HoverMeasurements): WasteCa
     valleys: roofData.valleys,
     rakes: roofData.rakes,
     eaves: roofData.eaves,
-    flashing: 0,       // typically manual input
-    stepFlashing: 0,    // typically manual input
+    flashing,
+    stepFlashing,
     ridgeVentLength: 0, // typically manual input
     steepAreas: {},     // typically manual input per pitch tier
 
@@ -130,43 +137,57 @@ function extractRoofData(measurements: HoverMeasurements): {
   rakes: number
   eaves: number
 } {
-  // Hover sometimes includes roof data in the summary or as a top-level key
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const m = measurements as any
   const roof = m.roof || m.roof_summary
 
-  // Diagnostic: log top-level keys and roof structure to help debug
-  console.log('[extractRoofData] Top-level measurement keys:', Object.keys(measurements))
-  if (roof) {
-    console.log('[extractRoofData] Roof object type:', typeof roof)
-    if (typeof roof === 'object' && roof !== null) {
-      console.log('[extractRoofData] Roof keys:', Object.keys(roof))
-      for (const key of ['total_area', 'area', 'ridges', 'ridge_length', 'hips', 'hip_length', 'valleys', 'valley_length', 'rakes', 'rake_length', 'eaves', 'eave_length']) {
-        const val = roof[key]
-        if (val !== undefined) {
-          console.log(`[extractRoofData]   roof.${key}: type=${typeof val}, value=${typeof val === 'object' ? JSON.stringify(val).slice(0, 200) : val}`)
-        }
-      }
-    }
-  } else {
-    console.log('[extractRoofData] No roof or roof_summary key found')
-  }
-
+  // Diagnostic: log the roof structure
   if (roof && typeof roof === 'object') {
-    const result = {
-      area: toNum(roof.total_area) || toNum(roof.area),
-      ridges: toNum(roof.ridges) || toNum(roof.ridge_length),
-      hips: toNum(roof.hips) || toNum(roof.hip_length),
-      valleys: toNum(roof.valleys) || toNum(roof.valley_length),
-      rakes: toNum(roof.rakes) || toNum(roof.rake_length),
-      eaves: toNum(roof.eaves) || toNum(roof.eave_length),
-    }
-    console.log('[extractRoofData] Extracted result:', JSON.stringify(result))
-    return result
+    console.log('[extractRoofData] Roof keys:', Object.keys(roof))
+    if (roof.measurements) console.log('[extractRoofData] roof.measurements keys:', Object.keys(roof.measurements))
+    if (roof.area) console.log('[extractRoofData] roof.area:', JSON.stringify(roof.area).slice(0, 200))
+  } else {
+    console.log('[extractRoofData] No roof key found. Top-level keys:', Object.keys(measurements))
   }
 
-  console.log('[extractRoofData] Returning all zeros (no roof data)')
-  return { area: 0, ridges: 0, hips: 0, valleys: 0, rakes: 0, eaves: 0 }
+  if (!roof || typeof roof !== 'object') {
+    console.log('[extractRoofData] Returning all zeros (no roof data)')
+    return { area: 0, ridges: 0, hips: 0, valleys: 0, rakes: 0, eaves: 0 }
+  }
+
+  // Hover full_json structure has:
+  //   roof.area.total         -> total roof area in sq ft
+  //   roof.measurements.*     -> linear footage values
+  //   roof.measurements.ridges, .hips, .valleys, .rakes, .gutters_eaves, .flashing, .step_flashing
+  //
+  // But some Hover versions or summarized_json may have flat:
+  //   roof.total_area or roof.ridges directly
+
+  // Area: try roof.area.total first (full_json), then flat keys
+  let area = 0
+  if (roof.area && typeof roof.area === 'object' && roof.area !== null) {
+    area = toNum(roof.area.total) || toNum(roof.area.facets_total)
+  }
+  if (!area) {
+    area = toNum(roof.total_area)
+  }
+  // Fallback: sum facets if facets array exists
+  if (!area && Array.isArray(roof.facets)) {
+    area = roof.facets.reduce((sum: number, f: { area?: unknown }) => sum + toNum(f.area), 0)
+  }
+
+  // Linear measurements: try roof.measurements.* first (full_json), then flat keys
+  const meas = (roof.measurements && typeof roof.measurements === 'object') ? roof.measurements : roof
+  const ridges = toNum(meas.ridges) || toNum(meas.ridge_length)
+  const hips = toNum(meas.hips) || toNum(meas.hip_length)
+  const valleys = toNum(meas.valleys) || toNum(meas.valley_length)
+  const rakes = toNum(meas.rakes) || toNum(meas.rake_length)
+  // Hover uses "gutters_eaves" for eave linear footage
+  const eaves = toNum(meas.eaves) || toNum(meas.gutters_eaves) || toNum(meas.eave_length)
+
+  const result = { area, ridges, hips, valleys, rakes, eaves }
+  console.log('[extractRoofData] Extracted result:', JSON.stringify(result))
+  return result
 }
 
 /**

@@ -17,6 +17,11 @@ export async function GET(request: NextRequest) {
     query = query.eq('status', status)
   }
 
+  const ccAccountId = request.nextUrl.searchParams.get('cc_account_id')
+  if (ccAccountId) {
+    query = query.eq('cc_account_id', Number(ccAccountId))
+  }
+
   const limit = request.nextUrl.searchParams.get('limit')
 
   if (limit) {
@@ -73,7 +78,15 @@ export async function POST(request: NextRequest) {
       tax_rate: body.tax_rate || 0,
       client_name: body.client_name || null,
       client_address: body.client_address || null,
+      client_city: body.client_city || null,
+      client_state: body.client_state || null,
+      client_zip: body.client_zip || null,
+      client_phone: body.client_phone || null,
+      client_email: body.client_email || null,
       cc_account_id: body.cc_account_id || null,
+      hover_job_id: body.hover_job_id || null,
+      hover_model_id: body.hover_model_id || null,
+      hover_address: body.hover_address || null,
     })
     .select()
     .single()

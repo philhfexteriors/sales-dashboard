@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useBidForm } from '@/components/BidFormProvider'
-import { parseFacadeData } from '@/lib/services/hoverTypes'
+import { parseFacadeData, parseHoverWindows } from '@/lib/services/hoverTypes'
 import type { HoverMeasurements } from '@/lib/services/hoverTypes'
 import toast from 'react-hot-toast'
 
@@ -50,12 +50,14 @@ export default function BidMeasurementsStep() {
     )
   }
 
+  const trade = bid.trade
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-gray-900 mb-1">Measurements</h2>
         <p className="text-sm text-gray-500">
-          Pull measurement data from Hover to auto-calculate quantities.
+          Pull measurement data from Hover to auto-calculate {trade} quantities.
         </p>
       </div>
 
@@ -70,7 +72,7 @@ export default function BidMeasurementsStep() {
         </button>
       )}
 
-      {/* Measurement display */}
+      {/* Measurement display — filtered by trade */}
       {measurements && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -84,7 +86,7 @@ export default function BidMeasurementsStep() {
             </button>
           </div>
 
-          {/* Summary */}
+          {/* Summary address */}
           {measurements.summary && (
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-700">
@@ -93,44 +95,24 @@ export default function BidMeasurementsStep() {
             </div>
           )}
 
-          {/* Facades */}
-          {measurements.facades && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">Facades</h4>
-              <div className="space-y-2">
-                {parseFacadeData(measurements).map((facade, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">{facade.materialType}</span>
-                    <div className="flex gap-4 text-gray-900">
-                      <span>{Math.round(facade.totalArea)} sq ft</span>
-                      <span>{facade.facadeCount} facades</span>
-                      <span>{facade.totalOpenings} openings</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* Roof measurements */}
+          {trade === 'roof' && (
+            <RoofMeasurements measurements={measurements} />
           )}
 
-          {/* Windows */}
-          {measurements.openings && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">Openings</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-500">Windows:</span>
-                  <span className="ml-2 font-medium">{measurements.openings.windows.length}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Doors:</span>
-                  <span className="ml-2 font-medium">{measurements.openings.doors.length}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Window Groups:</span>
-                  <span className="ml-2 font-medium">{measurements.openings.window_groups.length}</span>
-                </div>
-              </div>
-            </div>
+          {/* Siding measurements */}
+          {(trade === 'siding' || trade === 'fascia_soffit') && (
+            <SidingMeasurements measurements={measurements} />
+          )}
+
+          {/* Gutter measurements */}
+          {trade === 'gutters' && (
+            <GutterMeasurements measurements={measurements} />
+          )}
+
+          {/* Window measurements */}
+          {trade === 'windows' && (
+            <WindowMeasurements measurements={measurements} />
           )}
 
           <p className="text-xs text-gray-400">
@@ -139,6 +121,174 @@ export default function BidMeasurementsStep() {
           </p>
         </div>
       )}
+    </div>
+  )
+}
+
+function RoofMeasurements({ measurements }: { measurements: HoverMeasurements }) {
+  // Extract roof data if available (from roof key or summary)
+  const roofData = measurements.roof as Record<string, unknown> | undefined
+
+  return (
+    <div className="space-y-3">
+      {roofData ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Roof Measurements</h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+            {roofData.total_area != null && (
+              <MeasurementValue label="Total Area" value={`${Math.round(roofData.total_area as number)} sq ft`} />
+            )}
+            {roofData.ridges != null && (
+              <MeasurementValue label="Ridges" value={`${Math.round(roofData.ridges as number)} ft`} />
+            )}
+            {roofData.hips != null && (
+              <MeasurementValue label="Hips" value={`${Math.round(roofData.hips as number)} ft`} />
+            )}
+            {roofData.valleys != null && (
+              <MeasurementValue label="Valleys" value={`${Math.round(roofData.valleys as number)} ft`} />
+            )}
+            {roofData.rakes != null && (
+              <MeasurementValue label="Rakes" value={`${Math.round(roofData.rakes as number)} ft`} />
+            )}
+            {roofData.eaves != null && (
+              <MeasurementValue label="Eaves" value={`${Math.round(roofData.eaves as number)} ft`} />
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-sm text-amber-800">
+            Roof-specific measurements not available from Hover for this model.
+            Quantities can be entered manually in the next step.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SidingMeasurements({ measurements }: { measurements: HoverMeasurements }) {
+  const facades = measurements.facades ? parseFacadeData(measurements) : []
+  const totalSidingArea = facades.reduce((sum, f) => sum + f.totalArea, 0)
+
+  return (
+    <div className="space-y-3">
+      {/* Facades */}
+      {facades.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Facades</h4>
+          <div className="space-y-2">
+            {facades.map((facade, i) => (
+              <div key={i} className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">{facade.materialType}</span>
+                <div className="flex gap-4 text-gray-900">
+                  <span>{Math.round(facade.totalArea)} sq ft</span>
+                  <span>{facade.facadeCount} facades</span>
+                  <span>{facade.totalOpenings} openings</span>
+                </div>
+              </div>
+            ))}
+            <div className="border-t border-gray-100 pt-2 mt-2 flex justify-between text-sm font-medium">
+              <span className="text-gray-700">Total Siding Area</span>
+              <span className="text-gray-900">{Math.round(totalSidingArea)} sq ft</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Openings (relevant for siding — need to cut around them) */}
+      {measurements.openings && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Openings</h4>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <MeasurementValue label="Windows" value={String(measurements.openings.windows.length)} />
+            <MeasurementValue label="Doors" value={String(measurements.openings.doors.length)} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GutterMeasurements({ measurements }: { measurements: HoverMeasurements }) {
+  // Gutter data comes from eaves in roof measurements
+  const roofData = measurements.roof as Record<string, unknown> | undefined
+
+  return (
+    <div className="space-y-3">
+      {roofData?.eaves != null ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Gutter Measurements</h4>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <MeasurementValue label="Eaves (Gutter Run)" value={`${Math.round(roofData.eaves as number)} ft`} />
+          </div>
+        </div>
+      ) : (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-sm text-amber-800">
+            Gutter measurements (eaves) not available from Hover for this model.
+            Quantities can be entered manually in the next step.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function WindowMeasurements({ measurements }: { measurements: HoverMeasurements }) {
+  const windows = measurements.openings ? parseHoverWindows(measurements) : []
+
+  return (
+    <div className="space-y-3">
+      {windows.length > 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Windows ({windows.length})</h4>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {windows.map((w, i) => (
+              <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-gray-50 last:border-0">
+                <div>
+                  <span className="font-medium text-gray-900">{w.label}</span>
+                  <span className="text-gray-400 ml-2">{w.groupName}</span>
+                </div>
+                <div className="flex gap-3 text-gray-600">
+                  <span>{w.roundedWidth}&quot; x {w.roundedHeight}&quot;</span>
+                  <span>{w.unitedInches} UI</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-sm text-amber-800">
+            No window data available from Hover for this model.
+          </p>
+        </div>
+      )}
+
+      {/* Also show doors */}
+      {measurements.openings?.doors && measurements.openings.doors.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Doors ({measurements.openings.doors.length})</h4>
+          <div className="space-y-2">
+            {measurements.openings.doors.map((d, i) => (
+              <div key={i} className="flex items-center justify-between text-sm">
+                <span className="font-medium text-gray-900">{d.opening}</span>
+                <span className="text-gray-600">{d.width_x_height}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MeasurementValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span className="text-gray-500">{label}:</span>
+      <span className="ml-2 font-medium text-gray-900">{value}</span>
     </div>
   )
 }

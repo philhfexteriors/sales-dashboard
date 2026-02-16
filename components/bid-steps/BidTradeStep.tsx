@@ -108,8 +108,8 @@ export default function BidTradeStep() {
 
       {/* Configuration grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Pitch */}
-        {(bid.trade === 'roof' || bid.trade === 'siding') && (
+        {/* Pitch (roofing only) */}
+        {bid.trade === 'roof' && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Pitch</label>
             <select
@@ -125,19 +125,21 @@ export default function BidTradeStep() {
           </div>
         )}
 
-        {/* Stories */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Stories</label>
-          <select
-            value={bid.stories}
-            onChange={e => updateBid({ stories: parseInt(e.target.value) })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm"
-          >
-            <option value={1}>1 Story</option>
-            <option value={2}>2 Stories</option>
-            <option value={3}>3 Stories</option>
-          </select>
-        </div>
+        {/* Stories (roofing only) */}
+        {bid.trade === 'roof' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Stories</label>
+            <select
+              value={bid.stories}
+              onChange={e => updateBid({ stories: parseInt(e.target.value) })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm"
+            >
+              <option value={1}>1 Story</option>
+              <option value={2}>2 Stories</option>
+              <option value={3}>3 Stories</option>
+            </select>
+          </div>
+        )}
 
         {/* Labor Difficulty */}
         <div>
@@ -163,20 +165,6 @@ export default function BidTradeStep() {
             max="100"
             value={bid.default_margin_pct}
             onChange={e => updateBid({ default_margin_pct: parseFloat(e.target.value) || 30 })}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm"
-          />
-        </div>
-
-        {/* Tax Rate */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tax Rate %</label>
-          <input
-            type="number"
-            step="0.125"
-            min="0"
-            max="20"
-            value={bid.tax_rate}
-            onChange={e => updateBid({ tax_rate: parseFloat(e.target.value) || 0 })}
             className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm"
           />
         </div>

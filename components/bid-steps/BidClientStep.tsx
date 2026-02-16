@@ -63,6 +63,31 @@ export default function BidClientStep() {
     }, 400)
   }
 
+  // Auto-fetch tax rate when zip code changes
+  useEffect(() => {
+    const zip = bid.client_zip?.trim()
+    if (!zip || zip.length !== 5) return
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/tax-rates?zip=${encodeURIComponent(zip)}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data) && data.length > 0) {
+            // rate is stored as decimal (0.0825), convert to percentage (8.25)
+            const taxPct = data[0].rate * 100
+            updateBid({ tax_rate: taxPct })
+          }
+        }
+      } catch {
+        // ignore — user can set tax rate manually
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bid.client_zip])
+
   function selectCcAccount(result: CCResult) {
     updateBid({
       cc_account_id: result.id,

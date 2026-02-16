@@ -16,6 +16,16 @@ export default function Navigation() {
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: HomeIcon },
+    { href: '/bids', label: 'Bids', icon: BidIcon, children: [
+      { href: '/bids/new', label: 'Add Bid', icon: PlusIcon },
+    ]},
+    { href: '/dashboard', label: 'Production Plans', icon: PlanIcon, children: [
+      { href: '/plans/new', label: 'Add Production Plan', icon: PlusIcon },
+    ]},
+  ]
+
+  const mobileNavItems = [
+    { href: '/dashboard', label: 'Home', icon: HomeIcon },
     { href: '/bids', label: 'Bids', icon: BidIcon },
     { href: '/bids/new', label: 'New Bid', icon: PlusIcon },
     { href: '/plans/new', label: 'New Plan', icon: PlusIcon },
@@ -25,6 +35,7 @@ export default function Navigation() {
     { href: '/admin/products', label: 'Products', icon: BoxIcon },
     { href: '/admin/price-list', label: 'Price List', icon: PriceIcon },
     { href: '/admin/bid-templates', label: 'Bid Templates', icon: TemplateIcon },
+    { href: '/admin/tax-rates', label: 'Tax Rates', icon: PriceIcon },
     { href: '/admin/start-dates', label: 'Start Dates', icon: CalendarIcon },
     { href: '/admin/payment-notes', label: 'Payment Notes', icon: NoteIcon },
     { href: '/admin/terms', label: 'Terms & Conditions', icon: DocIcon },
@@ -39,17 +50,29 @@ export default function Navigation() {
       {/* Desktop sidebar */}
       <nav className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 h-screen sticky top-0">
         <div className="p-6 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-primary">Production Plan</h1>
+          <h1 className="text-xl font-bold text-primary">Sales Dashboard</h1>
           <p className="text-xs text-secondary mt-1">H&F Exteriors</p>
         </div>
 
         <div className="flex-1 py-4 overflow-y-auto">
           <div className="px-3 space-y-1">
             {navItems.map(item => (
-              <NavLink key={item.href} href={item.href} active={pathname === item.href || pathname.startsWith(item.href + '/')}>
-                <item.icon />
-                {item.label}
-              </NavLink>
+              <div key={item.href + item.label}>
+                <NavLink href={item.href} active={pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))}>
+                  <item.icon />
+                  {item.label}
+                </NavLink>
+                {item.children && (
+                  <div className="ml-8 mt-0.5 space-y-0.5">
+                    {item.children.map(child => (
+                      <NavLink key={child.href} href={child.href} active={pathname === child.href} small>
+                        <child.icon />
+                        {child.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
 
@@ -97,7 +120,7 @@ export default function Navigation() {
       {/* Mobile/iPad bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-bottom">
         <div className="flex justify-around items-center py-2">
-          {navItems.map(item => (
+          {mobileNavItems.map(item => (
             <Link
               key={item.href}
               href={item.href}
@@ -135,11 +158,13 @@ export default function Navigation() {
   )
 }
 
-function NavLink({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
+function NavLink({ href, active, children, small }: { href: string; active: boolean; children: React.ReactNode; small?: boolean }) {
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+      className={`flex items-center gap-3 rounded-lg font-medium transition-colors ${
+        small ? 'px-3 py-1.5 text-xs' : 'px-3 py-2.5 text-sm'
+      } ${
         active
           ? 'bg-primary/10 text-primary'
           : 'text-gray-700 hover:bg-gray-100'
@@ -210,6 +235,14 @@ function LogoutIcon() {
   return (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+    </svg>
+  )
+}
+
+function PlanIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
     </svg>
   )
 }

@@ -7,6 +7,8 @@ export interface BidSummary {
   id: string
   status: string
   client_name: string | null
+  client_address: string | null
+  cc_account_id: number | null
   trade: string
   grand_total: number
   updated_at: string

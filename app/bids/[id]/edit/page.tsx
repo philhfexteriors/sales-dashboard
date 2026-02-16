@@ -12,6 +12,7 @@ import BidHoverStep from '@/components/bid-steps/BidHoverStep'
 import BidMeasurementsStep from '@/components/bid-steps/BidMeasurementsStep'
 import BidLineItemsStep from '@/components/bid-steps/BidLineItemsStep'
 import BidReviewStep from '@/components/bid-steps/BidReviewStep'
+import RelatedBids from '@/components/bid-steps/RelatedBids'
 
 const STEPS = [
   { key: 'client', label: 'Client' },
@@ -67,6 +68,7 @@ function BidEditor() {
       />
 
       <div className="p-4 sm:p-6 max-w-4xl mx-auto pb-24">
+        <RelatedBids />
         {currentStepKey === 'client' && <BidClientStep />}
         {currentStepKey === 'trade' && <BidTradeStep />}
         {currentStepKey === 'hover' && <BidHoverStep />}

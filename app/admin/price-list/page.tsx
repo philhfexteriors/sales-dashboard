@@ -693,7 +693,7 @@ function ItemSection({ title, sectionKey, items, categories, selectedCategoryId,
               <tr className="bg-gray-50 text-left">
                 <th className="px-3 py-3 font-medium text-gray-500 w-8"></th>
                 <th className="px-3 py-3 font-medium text-gray-500">Brand</th>
-                <th className="px-3 py-3 font-medium text-gray-500">Description</th>
+                <th className="px-3 py-3 font-medium text-gray-500">Line</th>
                 <th className="px-3 py-3 font-medium text-gray-500">Unit</th>
                 <th className="px-3 py-3 font-medium text-gray-500 text-right">Price</th>
                 <th className="px-3 py-3 font-medium text-gray-500 text-center">Tax</th>
@@ -727,7 +727,7 @@ function ItemSection({ title, sectionKey, items, categories, selectedCategoryId,
               <input value={newItem.brand} onChange={e => onNewItemChange({ ...newItem, brand: e.target.value })} placeholder="e.g., CertainTeed, GAF, OC" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Line</label>
               <input value={newItem.description} onChange={e => onNewItemChange({ ...newItem, description: e.target.value })} placeholder={sectionKey === 'materials' ? 'e.g., Landmark Pro Shingles' : 'e.g., Tear Off (per SQ)'} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
             </div>
             <div>

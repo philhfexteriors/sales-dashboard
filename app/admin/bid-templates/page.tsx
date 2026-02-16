@@ -325,19 +325,25 @@ function TemplateCard({
     setSaving(false)
   }
 
-  const addItem = () => {
+  const addItem = (fromCatalog?: PriceListItem) => {
     setItems(prev => [...prev, {
       id: `new-${Date.now()}`,
-      section: 'materials',
-      description: '',
-      unit: 'EA',
+      section: fromCatalog?.section as 'materials' | 'labor' || 'materials',
+      description: fromCatalog?.description || '',
+      unit: fromCatalog?.unit || 'EA',
       default_qty_formula: null,
       default_qty: null,
       is_required: true,
       sort_order: prev.length,
       measurement_key: null,
       depends_on_item_id: null,
-      price_list: null,
+      price_list: fromCatalog ? {
+        id: fromCatalog.id,
+        description: fromCatalog.description,
+        unit: fromCatalog.unit,
+        unit_price: fromCatalog.unit_price,
+        is_taxable: fromCatalog.is_taxable,
+      } : null,
     }])
     setDirty(true)
   }
@@ -478,15 +484,12 @@ function TemplateCard({
             </div>
           )}
 
-          {/* Add item button */}
-          <div className="px-4 py-3 border-t border-gray-100">
-            <button
-              onClick={addItem}
-              className="text-sm text-primary font-medium hover:text-primary-dark"
-            >
-              + Add Item
-            </button>
-          </div>
+          {/* Add item from catalog */}
+          <AddTemplateItemPicker
+            priceListItems={priceListItems}
+            onSelectCatalog={(pl) => addItem(pl)}
+            onCustom={() => addItem()}
+          />
 
           {/* Save button at bottom */}
           {dirty && (
@@ -734,6 +737,146 @@ function FormulaHelpPopover({ trade, onClose }: { trade: string; onClose: () => 
           <div>{'({hips} + {ridges}) * 1.15 / 30'}</div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ---------- Add Template Item Picker ----------
+
+function AddTemplateItemPicker({
+  priceListItems,
+  onSelectCatalog,
+  onCustom,
+}: {
+  priceListItems: PriceListItem[]
+  onSelectCatalog: (item: PriceListItem) => void
+  onCustom: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        setSearch('')
+      }
+    }
+    if (open) {
+      document.addEventListener('mousedown', handleClick)
+      return () => document.removeEventListener('mousedown', handleClick)
+    }
+  }, [open])
+
+  const filtered = search
+    ? priceListItems.filter(i =>
+        i.description.toLowerCase().includes(search.toLowerCase()) ||
+        i.brand?.toLowerCase().includes(search.toLowerCase())
+      )
+    : priceListItems
+
+  // Group by section
+  const materials = filtered.filter(i => i.section === 'materials')
+  const labor = filtered.filter(i => i.section === 'labor')
+
+  return (
+    <div className="px-4 py-3 border-t border-gray-100 relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="text-sm text-primary font-medium hover:text-primary-dark"
+      >
+        + Add Item from Catalog
+      </button>
+
+      {open && (
+        <div className="absolute z-50 bottom-full mb-1 left-4 w-96 bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden">
+          {/* Search */}
+          <div className="p-3 border-b border-gray-100">
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search catalog..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              autoFocus
+            />
+          </div>
+
+          {/* Items grouped by section */}
+          <div className="max-h-72 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-sm text-gray-500 p-4 text-center">
+                {search ? 'No matching items' : 'No catalog items for this trade'}
+              </p>
+            ) : (
+              <>
+                {materials.length > 0 && (
+                  <div>
+                    <div className="px-4 py-1.5 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider sticky top-0">
+                      Materials
+                    </div>
+                    {materials.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          onSelectCatalog(item)
+                          setOpen(false)
+                          setSearch('')
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-primary/5 flex items-center justify-between group transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm text-gray-900 group-hover:text-primary">{item.description}</div>
+                          <div className="text-xs text-gray-400">{item.brand && `${item.brand} · `}{item.unit}</div>
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 ml-4 shrink-0">
+                          ${item.unit_price.toFixed(2)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {labor.length > 0 && (
+                  <div>
+                    <div className="px-4 py-1.5 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider sticky top-0">
+                      Labor
+                    </div>
+                    {labor.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          onSelectCatalog(item)
+                          setOpen(false)
+                          setSearch('')
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-primary/5 flex items-center justify-between group transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm text-gray-900 group-hover:text-primary">{item.description}</div>
+                          <div className="text-xs text-gray-400">{item.brand && `${item.brand} · `}{item.unit}</div>
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 ml-4 shrink-0">
+                          ${item.unit_price.toFixed(2)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Custom item option */}
+          <div className="border-t border-gray-100 p-2">
+            <button
+              onClick={() => { onCustom(); setOpen(false); setSearch('') }}
+              className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              + Add custom item (not in catalog)
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

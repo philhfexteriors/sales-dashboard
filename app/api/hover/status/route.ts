@@ -8,9 +8,14 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const configured = isHoverConfigured()
-  const connected = configured ? await isHoverConnected() : false
-
-  console.log('[hover/status] HOVER_CLIENT_ID set:', !!process.env.HOVER_CLIENT_ID, '| HOVER_CLIENT_SECRET set:', !!process.env.HOVER_CLIENT_SECRET, '| configured:', configured, '| connected:', connected)
+  let connected = false
+  if (configured) {
+    try {
+      connected = await isHoverConnected()
+    } catch (err) {
+      console.error('[hover/status] Error checking connection:', err)
+    }
+  }
 
   return NextResponse.json({ configured, connected })
 }

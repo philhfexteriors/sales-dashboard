@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { trade, name, description, sort_order } = body
+  const { trade, name, description, sort_order, variant_groups } = body
 
   if (!trade || !name) {
     return NextResponse.json({ error: 'trade and name are required' }, { status: 400 })
@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       name,
       description: description || null,
       sort_order: sort_order || 0,
+      variant_groups: variant_groups || ['color'],
     })
     .select()
     .single()

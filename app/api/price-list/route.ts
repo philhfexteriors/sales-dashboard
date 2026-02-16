@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase
     .from('price_list')
-    .select('*, category:price_list_categories(id, name)')
+    .select('*, category:price_list_categories(id, name, variant_groups)')
     .order('trade')
     .order('section')
     .order('sort_order')
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { trade, section, item_code, description, unit, unit_price, is_taxable, sort_order, notes, category_id } = body
+  const { trade, section, item_code, brand, description, unit, unit_price, is_taxable, sort_order, notes, category_id } = body
 
   const { data, error } = await supabase
     .from('price_list')
@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
       trade,
       section,
       item_code,
+      brand: brand || null,
       description,
       unit,
       unit_price: unit_price || 0,

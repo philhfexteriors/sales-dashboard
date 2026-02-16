@@ -7,23 +7,14 @@ import VariantSelect from '@/components/fields/VariantSelect'
 
 interface CatalogItem {
   id: string
-  code: string
+  item_code: string
+  brand: string | null
   description: string
   unit: string
   unit_price: number
   section: string
   is_taxable: boolean
-  category?: { id: string; name: string } | null
-}
-
-interface AddedAddon {
-  fieldKey: string
-  price_list_id: string
-  description: string
-  unit: string
-  unit_price: number
-  qty: number
-  amount: number
+  category?: { id: string; name: string; variant_groups?: string[] | null } | null
 }
 
 // Map plan sections to catalog trades
@@ -55,9 +46,19 @@ export default function PlanCatalogAddon({ section }: PlanCatalogAddonProps) {
 
   const trade = sectionToTrade[section] || 'general'
 
-  // Fetch catalog items when picker opens
+  // Build a map of price_list_id to catalog item for category lookup
+  const catalogItemMap = catalogItems.reduce<Record<string, CatalogItem>>((acc, item) => {
+    acc[item.id] = item
+    return acc
+  }, {})
+
+  // Fetch catalog items when picker opens (or eagerly for variant group lookup)
   useEffect(() => {
-    if (!showPicker) return
+    if (!showPicker && catalogItems.length > 0) return
+    if (!showPicker) {
+      // Fetch in background for variant group info on already-added items
+      if (catalogLineItems.length === 0) return
+    }
     setLoading(true)
     fetch(`/api/price-list?trade=${trade}`)
       .then(r => r.json())
@@ -66,6 +67,7 @@ export default function PlanCatalogAddon({ section }: PlanCatalogAddonProps) {
         setLoading(false)
       })
       .catch(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showPicker, trade])
 
   // Close picker on outside click
@@ -107,7 +109,8 @@ export default function PlanCatalogAddon({ section }: PlanCatalogAddonProps) {
     const q = search.toLowerCase()
     return (
       item.description.toLowerCase().includes(q) ||
-      item.code?.toLowerCase().includes(q) ||
+      item.item_code?.toLowerCase().includes(q) ||
+      item.brand?.toLowerCase().includes(q) ||
       item.category?.name?.toLowerCase().includes(q)
     )
   })
@@ -129,6 +132,9 @@ export default function PlanCatalogAddon({ section }: PlanCatalogAddonProps) {
       {catalogLineItems.map(item => {
         const qty = (item.options as Record<string, number> | null)?.qty || 0
         const unitPrice = (item.options as Record<string, number> | null)?.unit_price || 0
+        const variantSelections = (item.options as Record<string, unknown> | null)?.variant_selections as Record<string, string | null> | undefined
+        const catItem = item.price_list_id ? catalogItemMap[item.price_list_id] : null
+        const categoryVariantGroups = catItem?.category?.variant_groups ?? undefined
 
         return (
           <div key={item.field_key} className="bg-white rounded-lg border border-primary/20 p-4">
@@ -196,13 +202,18 @@ export default function PlanCatalogAddon({ section }: PlanCatalogAddonProps) {
               </p>
             )}
 
-            {/* Variant selector (e.g. color) */}
+            {/* Variant selector (e.g. color, size) */}
             {item.price_list_id && (
               <div className="mt-2">
                 <VariantSelect
                   priceListId={item.price_list_id}
                   value={item.variant_id || null}
                   onChange={variantId => updateLineItem(item.field_key, section, { variant_id: variantId })}
+                  categoryVariantGroups={categoryVariantGroups || undefined}
+                  variantSelections={variantSelections || {}}
+                  onSelectionsChange={selections => updateLineItem(item.field_key, section, {
+                    options: { ...(item.options as Record<string, unknown> || {}), variant_selections: selections }
+                  })}
                 />
               </div>
             )}
@@ -264,7 +275,7 @@ export default function PlanCatalogAddon({ section }: PlanCatalogAddonProps) {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{item.description}</p>
                           <p className="text-xs text-gray-400">
-                            {item.code && `${item.code} · `}{item.unit} · ${item.section}
+                            {item.brand && `${item.brand} · `}{item.item_code} · {item.unit} · {item.section}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">

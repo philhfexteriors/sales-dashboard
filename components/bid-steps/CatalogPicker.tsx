@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from 'react'
 interface CatalogItem {
   id: string
   item_code: string
+  brand: string | null
   description: string
   unit: string
   unit_price: number
@@ -45,7 +46,8 @@ export default function CatalogPicker({ trade, section, onSelect, onCustom, onCl
   const filtered = search
     ? items.filter(i =>
         i.description.toLowerCase().includes(search.toLowerCase()) ||
-        i.item_code.toLowerCase().includes(search.toLowerCase())
+        i.item_code.toLowerCase().includes(search.toLowerCase()) ||
+        i.brand?.toLowerCase().includes(search.toLowerCase())
       )
     : items
 
@@ -101,7 +103,7 @@ export default function CatalogPicker({ trade, section, onSelect, onCustom, onCl
                 >
                   <div className="min-w-0">
                     <div className="text-sm text-gray-900 group-hover:text-primary">{item.description}</div>
-                    <div className="text-xs text-gray-400 font-mono">{item.item_code} · {item.unit}</div>
+                    <div className="text-xs text-gray-400 font-mono">{item.brand && `${item.brand} · `}{item.item_code} · {item.unit}</div>
                   </div>
                   <span className="text-sm font-medium text-gray-700 ml-4 shrink-0">
                     ${item.unit_price.toFixed(2)}

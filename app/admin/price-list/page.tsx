@@ -13,6 +13,7 @@ interface Category {
   description: string | null
   sort_order: number
   active: boolean
+  variant_groups: string[] | null
 }
 
 interface PriceListItem {
@@ -20,6 +21,7 @@ interface PriceListItem {
   trade: string
   section: string
   item_code: string
+  brand: string | null
   description: string
   unit: string
   unit_price: number
@@ -28,8 +30,10 @@ interface PriceListItem {
   sort_order: number
   notes: string | null
   category_id: string | null
-  category: { id: string; name: string } | null
+  category: { id: string; name: string; variant_groups: string[] | null } | null
 }
+
+const DEFAULT_VARIANT_GROUPS = ['color', 'size', 'style']
 
 interface Variant {
   id: string
@@ -66,12 +70,13 @@ export default function ProductCatalogAdmin() {
   const [expandedVariantsId, setExpandedVariantsId] = useState<string | null>(null)
   const [variants, setVariants] = useState<Variant[]>([])
   const [variantsLoading, setVariantsLoading] = useState(false)
-  const [newVariantName, setNewVariantName] = useState('')
+  const [newVariantNames, setNewVariantNames] = useState<Record<string, string>>({})
 
   // Add item form
   const [showAddForm, setShowAddForm] = useState(false)
   const [newItem, setNewItem] = useState({
     item_code: '',
+    brand: '',
     description: '',
     unit: 'EA',
     unit_price: 0,
@@ -84,6 +89,8 @@ export default function ProductCatalogAdmin() {
   // Add category form
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [newCategoryVariantGroups, setNewCategoryVariantGroups] = useState<string[]>(['color'])
+  const [customGroupInput, setCustomGroupInput] = useState('')
 
   // Edit category
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
@@ -131,11 +138,13 @@ export default function ProductCatalogAdmin() {
       const res = await fetch('/api/price-list/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trade: activeTrade, name: newCategoryName.trim(), sort_order: categories.length }),
+        body: JSON.stringify({ trade: activeTrade, name: newCategoryName.trim(), sort_order: categories.length, variant_groups: newCategoryVariantGroups }),
       })
       if (res.ok) {
         toast.success('Category added')
         setNewCategoryName('')
+        setNewCategoryVariantGroups(['color'])
+        setCustomGroupInput('')
         setShowAddCategory(false)
         fetchCategories()
       } else {
@@ -179,6 +188,7 @@ export default function ProductCatalogAdmin() {
   function startEditing(item: PriceListItem) {
     setEditingId(item.id)
     setEditData({
+      brand: item.brand,
       description: item.description,
       unit: item.unit,
       unit_price: item.unit_price,
@@ -237,7 +247,7 @@ export default function ProductCatalogAdmin() {
       if (res.ok) {
         toast.success('Item added')
         setShowAddForm(false)
-        setNewItem({ item_code: '', description: '', unit: 'EA', unit_price: 0, section: 'materials', is_taxable: false, notes: '', category_id: null })
+        setNewItem({ item_code: '', brand: '', description: '', unit: 'EA', unit_price: 0, section: 'materials', is_taxable: false, notes: '', category_id: null })
         fetchItems()
       } else {
         const err = await res.json()
@@ -254,7 +264,7 @@ export default function ProductCatalogAdmin() {
     }
     setExpandedVariantsId(itemId)
     setVariantsLoading(true)
-    setNewVariantName('')
+    setNewVariantNames({})
     try {
       const res = await fetch(`/api/price-list/variants?price_list_id=${itemId}&active=false`)
       if (res.ok) setVariants(await res.json())
@@ -269,17 +279,23 @@ export default function ProductCatalogAdmin() {
     } catch { /* ignore */ }
   }
 
-  async function addVariant(itemId: string) {
-    if (!newVariantName.trim()) return
+  async function addVariant(itemId: string, variantGroup: string = 'color') {
+    const name = (newVariantNames[variantGroup] || '').trim()
+    if (!name) return
     try {
       const res = await fetch('/api/price-list/variants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ price_list_id: itemId, name: newVariantName.trim(), sort_order: variants.length }),
+        body: JSON.stringify({
+          price_list_id: itemId,
+          name,
+          variant_group: variantGroup,
+          sort_order: variants.filter(v => v.variant_group === variantGroup).length,
+        }),
       })
       if (res.ok) {
         toast.success('Variant added')
-        setNewVariantName('')
+        setNewVariantNames(prev => ({ ...prev, [variantGroup]: '' }))
         refreshVariants(itemId)
       } else { toast.error('Failed to add variant') }
     } catch { toast.error('Failed to add variant') }
@@ -365,6 +381,10 @@ export default function ProductCatalogAdmin() {
                   </select>
                 </div>
                 <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Brand</label>
+                  <input value={newItem.brand} onChange={e => setNewItem({ ...newItem, brand: e.target.value })} placeholder="e.g., OC, GAF" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Item Code</label>
                   <input value={newItem.item_code} onChange={e => setNewItem({ ...newItem, item_code: e.target.value })} placeholder="e.g., ROOF-SHINGLES" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
@@ -408,17 +428,67 @@ export default function ProductCatalogAdmin() {
                 </div>
 
                 {showAddCategory && (
-                  <div className="flex gap-1.5 mb-3">
-                    <input
-                      value={newCategoryName}
-                      onChange={e => setNewCategoryName(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && addCategory()}
-                      placeholder="Category name"
-                      className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                      autoFocus
-                    />
-                    <button onClick={addCategory} className="px-2 py-1.5 bg-primary text-white rounded-lg text-xs">Add</button>
-                    <button onClick={() => { setShowAddCategory(false); setNewCategoryName('') }} className="px-2 py-1.5 text-gray-500 text-xs">✕</button>
+                  <div className="mb-3 space-y-2">
+                    <div className="flex gap-1.5">
+                      <input
+                        value={newCategoryName}
+                        onChange={e => setNewCategoryName(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && addCategory()}
+                        placeholder="Category name"
+                        className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                        autoFocus
+                      />
+                      <button onClick={addCategory} className="px-2 py-1.5 bg-primary text-white rounded-lg text-xs">Add</button>
+                      <button onClick={() => { setShowAddCategory(false); setNewCategoryName(''); setNewCategoryVariantGroups(['color']); setCustomGroupInput('') }} className="px-2 py-1.5 text-gray-500 text-xs">✕</button>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-medium text-gray-400 mb-1">Variant Attributes</label>
+                      <div className="flex flex-wrap gap-1">
+                        {DEFAULT_VARIANT_GROUPS.map(g => (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => setNewCategoryVariantGroups(prev =>
+                              prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]
+                            )}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors capitalize ${
+                              newCategoryVariantGroups.includes(g)
+                                ? 'bg-primary/10 border-primary/30 text-primary'
+                                : 'bg-gray-50 border-gray-200 text-gray-400'
+                            }`}
+                          >
+                            {newCategoryVariantGroups.includes(g) ? '✓ ' : ''}{g}
+                          </button>
+                        ))}
+                        {newCategoryVariantGroups.filter(g => !DEFAULT_VARIANT_GROUPS.includes(g)).map(g => (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => setNewCategoryVariantGroups(prev => prev.filter(x => x !== g))}
+                            className="px-2 py-0.5 rounded-full text-[10px] font-medium border bg-primary/10 border-primary/30 text-primary capitalize"
+                          >
+                            ✓ {g} ×
+                          </button>
+                        ))}
+                        <div className="flex gap-0.5">
+                          <input
+                            value={customGroupInput}
+                            onChange={e => setCustomGroupInput(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && customGroupInput.trim()) {
+                                const g = customGroupInput.trim().toLowerCase()
+                                if (!newCategoryVariantGroups.includes(g)) {
+                                  setNewCategoryVariantGroups(prev => [...prev, g])
+                                }
+                                setCustomGroupInput('')
+                              }
+                            }}
+                            placeholder="+ custom"
+                            className="w-16 px-1.5 py-0.5 border border-gray-200 rounded text-[10px]"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -454,8 +524,15 @@ export default function ProductCatalogAdmin() {
                               selectedCategoryId === cat.id ? 'bg-primary/10 text-primary font-medium' : 'text-gray-700 hover:bg-gray-50'
                             }`}
                           >
-                            {cat.name}
+                            <span>{cat.name}</span>
                             <span className="text-xs text-gray-400 ml-1">({items.filter(i => i.category_id === cat.id).length})</span>
+                            {cat.variant_groups && cat.variant_groups.length > 0 && (
+                              <div className="flex gap-0.5 mt-0.5">
+                                {cat.variant_groups.map(g => (
+                                  <span key={g} className="text-[9px] px-1 py-0 rounded bg-gray-100 text-gray-400 capitalize">{g}</span>
+                                ))}
+                              </div>
+                            )}
                           </button>
                           <div className="hidden group-hover:flex items-center gap-0.5 mr-1">
                             <button
@@ -508,8 +585,8 @@ export default function ProductCatalogAdmin() {
                   variants={variants}
                   variantsLoading={variantsLoading}
                   onToggleVariants={loadVariants}
-                  newVariantName={newVariantName}
-                  onNewVariantNameChange={setNewVariantName}
+                  newVariantNames={newVariantNames}
+                  onNewVariantNameChange={(group, name) => setNewVariantNames(prev => ({ ...prev, [group]: name }))}
                   onAddVariant={addVariant}
                   onToggleVariantActive={toggleVariantActive}
                   onDeleteVariant={deleteVariant}
@@ -530,8 +607,8 @@ export default function ProductCatalogAdmin() {
                   variants={variants}
                   variantsLoading={variantsLoading}
                   onToggleVariants={loadVariants}
-                  newVariantName={newVariantName}
-                  onNewVariantNameChange={setNewVariantName}
+                  newVariantNames={newVariantNames}
+                  onNewVariantNameChange={(group, name) => setNewVariantNames(prev => ({ ...prev, [group]: name }))}
                   onAddVariant={addVariant}
                   onToggleVariantActive={toggleVariantActive}
                   onDeleteVariant={deleteVariant}
@@ -561,9 +638,9 @@ interface ItemSectionProps {
   variants: Variant[]
   variantsLoading: boolean
   onToggleVariants: (itemId: string) => void
-  newVariantName: string
-  onNewVariantNameChange: (name: string) => void
-  onAddVariant: (itemId: string) => void
+  newVariantNames: Record<string, string>
+  onNewVariantNameChange: (group: string, name: string) => void
+  onAddVariant: (itemId: string, variantGroup: string) => void
   onToggleVariantActive: (v: Variant) => void
   onDeleteVariant: (v: Variant) => void
 }
@@ -580,7 +657,7 @@ function ItemSection({ title, items, categories, selectedCategoryId, ...props }:
             <thead>
               <tr className="bg-gray-50 text-left">
                 <th className="px-3 py-3 font-medium text-gray-500 w-8"></th>
-                <th className="px-3 py-3 font-medium text-gray-500">Code</th>
+                <th className="px-3 py-3 font-medium text-gray-500">Brand / Code</th>
                 <th className="px-3 py-3 font-medium text-gray-500">Description</th>
                 <th className="px-3 py-3 font-medium text-gray-500">Category</th>
                 <th className="px-3 py-3 font-medium text-gray-500">Unit</th>
@@ -603,7 +680,7 @@ function ItemSection({ title, items, categories, selectedCategoryId, ...props }:
 
 function ItemRow({
   item, categories, editingId, editData, onStartEdit, onSaveEdit, onCancelEdit, onEditChange, onToggleActive,
-  expandedVariantsId, variants, variantsLoading, onToggleVariants, newVariantName, onNewVariantNameChange,
+  expandedVariantsId, variants, variantsLoading, onToggleVariants, newVariantNames, onNewVariantNameChange,
   onAddVariant, onToggleVariantActive, onDeleteVariant,
 }: {
   item: PriceListItem
@@ -619,9 +696,9 @@ function ItemRow({
   variants: Variant[]
   variantsLoading: boolean
   onToggleVariants: (itemId: string) => void
-  newVariantName: string
-  onNewVariantNameChange: (name: string) => void
-  onAddVariant: (itemId: string) => void
+  newVariantNames: Record<string, string>
+  onNewVariantNameChange: (group: string, name: string) => void
+  onAddVariant: (itemId: string, variantGroup: string) => void
   onToggleVariantActive: (v: Variant) => void
   onDeleteVariant: (v: Variant) => void
 }) {
@@ -640,7 +717,10 @@ function ItemRow({
         </td>
         {isEditing ? (
           <>
-            <td className="px-3 py-2 font-mono text-xs text-gray-500">{item.item_code}</td>
+            <td className="px-3 py-2">
+              <input value={editData.brand || ''} onChange={e => onEditChange({ ...editData, brand: e.target.value || null })} placeholder="Brand" className="w-full px-2 py-1 border border-gray-300 rounded text-sm mb-1" />
+              <span className="font-mono text-[10px] text-gray-400">{item.item_code}</span>
+            </td>
             <td className="px-3 py-2">
               <input value={editData.description || ''} onChange={e => onEditChange({ ...editData, description: e.target.value })} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
             </td>
@@ -668,7 +748,11 @@ function ItemRow({
           </>
         ) : (
           <>
-            <td className="px-3 py-3 font-mono text-xs text-gray-500">{item.item_code}</td>
+            <td className="px-3 py-3">
+              {item.brand && <span className="font-medium text-gray-900">{item.brand}</span>}
+              {item.brand && <span className="text-gray-300 mx-1">·</span>}
+              <span className="font-mono text-xs text-gray-400">{item.item_code}</span>
+            </td>
             <td className="px-3 py-3 text-gray-900">{item.description}</td>
             <td className="px-3 py-3">
               {item.category ? (
@@ -697,38 +781,54 @@ function ItemRow({
               <p className="text-xs text-gray-500">Loading variants...</p>
             ) : (
               <div>
-                <h4 className="text-xs font-semibold text-gray-700 mb-2">
-                  Variants <span className="font-normal text-gray-400">(e.g., colors &mdash; don&apos;t affect price)</span>
-                </h4>
-
-                {variants.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {variants.map(v => (
-                      <span key={v.id} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border ${v.active ? 'bg-white border-gray-200 text-gray-700' : 'bg-gray-100 border-gray-200 text-gray-400 line-through'}`}>
-                        {v.name}
-                        <button onClick={() => onToggleVariantActive(v)} className={`ml-0.5 ${v.active ? 'text-gray-400 hover:text-red-500' : 'text-green-600'}`} title={v.active ? 'Deactivate' : 'Restore'}>
-                          {v.active ? '×' : '↺'}
-                        </button>
-                        {!v.active && (
-                          <button onClick={() => onDeleteVariant(v)} className="text-red-400 hover:text-red-600 ml-0.5" title="Delete permanently">
-                            ✕
-                          </button>
+                {(() => {
+                  // Get variant groups from the item's category, or default to ['color']
+                  const variantGroups = item.category?.variant_groups ?? ['color']
+                  // If category has no variant groups, show a message
+                  if (variantGroups.length === 0) {
+                    return (
+                      <p className="text-xs text-gray-400 italic">This category has no variant attributes configured.</p>
+                    )
+                  }
+                  return variantGroups.map(group => {
+                    const groupVariants = variants.filter(v => v.variant_group === group)
+                    const inputValue = newVariantNames[group] || ''
+                    return (
+                      <div key={group} className="mb-3 last:mb-0">
+                        <h4 className="text-xs font-semibold text-gray-700 mb-1.5 capitalize">
+                          {group} <span className="font-normal text-gray-400">({groupVariants.filter(v => v.active).length})</span>
+                        </h4>
+                        {groupVariants.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {groupVariants.map(v => (
+                              <span key={v.id} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border ${v.active ? 'bg-white border-gray-200 text-gray-700' : 'bg-gray-100 border-gray-200 text-gray-400 line-through'}`}>
+                                {v.name}
+                                <button onClick={() => onToggleVariantActive(v)} className={`ml-0.5 ${v.active ? 'text-gray-400 hover:text-red-500' : 'text-green-600'}`} title={v.active ? 'Deactivate' : 'Restore'}>
+                                  {v.active ? '×' : '↺'}
+                                </button>
+                                {!v.active && (
+                                  <button onClick={() => onDeleteVariant(v)} className="text-red-400 hover:text-red-600 ml-0.5" title="Delete permanently">
+                                    ✕
+                                  </button>
+                                )}
+                              </span>
+                            ))}
+                          </div>
                         )}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <input
-                    value={newVariantName}
-                    onChange={e => onNewVariantNameChange(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && onAddVariant(item.id)}
-                    placeholder="Add variant (e.g., Weathered Wood)"
-                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs flex-1 max-w-xs focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  />
-                  <button onClick={() => onAddVariant(item.id)} className="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-medium">Add</button>
-                </div>
+                        <div className="flex gap-2">
+                          <input
+                            value={inputValue}
+                            onChange={e => onNewVariantNameChange(group, e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && onAddVariant(item.id, group)}
+                            placeholder={`Add ${group} (e.g., ${group === 'color' ? 'Weathered Wood' : group === 'size' ? '5"' : '...'})`}
+                            className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs flex-1 max-w-xs focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                          />
+                          <button onClick={() => onAddVariant(item.id, group)} className="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-medium">Add</button>
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
               </div>
             )}
           </td>

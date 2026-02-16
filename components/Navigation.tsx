@@ -19,7 +19,7 @@ export default function Navigation() {
     { href: '/bids', label: 'Bids', icon: BidIcon, children: [
       { href: '/bids/new', label: 'Add Bid', icon: PlusIcon },
     ]},
-    { href: '/dashboard', label: 'Production Plans', icon: PlanIcon, children: [
+    { href: '/plans', label: 'Production Plans', icon: PlanIcon, children: [
       { href: '/plans/new', label: 'Add Production Plan', icon: PlusIcon },
     ]},
   ]

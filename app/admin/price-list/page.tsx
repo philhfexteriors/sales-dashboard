@@ -243,7 +243,7 @@ export default function ProductCatalogAdmin() {
           section: addingToSection,
           trade: activeTrade,
           sort_order: items.length,
-          category_id: newItem.category_id || selectedCategoryId === 'uncategorized' ? null : (newItem.category_id || selectedCategoryId || null),
+          category_id: newItem.category_id ? newItem.category_id : (selectedCategoryId && selectedCategoryId !== 'uncategorized' ? selectedCategoryId : null),
         }),
       })
       if (res.ok) {

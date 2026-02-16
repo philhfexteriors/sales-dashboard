@@ -530,16 +530,17 @@ function TemplateItemRow({
   onLinkPriceList: (pl: PriceListItem) => void
   onRemove: () => void
 }) {
-  const [showFormulaHelp, setShowFormulaHelp] = useState(false)
+  const [showVarPicker, setShowVarPicker] = useState(false)
   const [showPriceSearch, setShowPriceSearch] = useState(false)
-  const formulaHelpRef = useRef<HTMLDivElement>(null)
+  const varPickerRef = useRef<HTMLDivElement>(null)
   const priceSearchRef = useRef<HTMLDivElement>(null)
+  const formulaInputRef = useRef<HTMLInputElement>(null)
 
   // Close popovers on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (formulaHelpRef.current && !formulaHelpRef.current.contains(e.target as Node)) {
-        setShowFormulaHelp(false)
+      if (varPickerRef.current && !varPickerRef.current.contains(e.target as Node)) {
+        setShowVarPicker(false)
       }
       if (priceSearchRef.current && !priceSearchRef.current.contains(e.target as Node)) {
         setShowPriceSearch(false)
@@ -548,6 +549,36 @@ function TemplateItemRow({
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
+
+  // Insert a token into the formula at cursor position
+  const insertToken = (token: string) => {
+    const input = formulaInputRef.current
+    const current = item.default_qty_formula || ''
+    if (input) {
+      const start = input.selectionStart ?? current.length
+      const end = input.selectionEnd ?? current.length
+      // Add spaces around token if needed
+      const before = current.slice(0, start)
+      const after = current.slice(end)
+      const needSpaceBefore = before.length > 0 && !before.endsWith(' ') && !before.endsWith('(')
+      const needSpaceAfter = after.length > 0 && !after.startsWith(' ') && !after.startsWith(')')
+      const newFormula = before + (needSpaceBefore ? ' ' : '') + token + (needSpaceAfter ? ' ' : '') + after
+      onUpdate({ default_qty_formula: newFormula || null })
+      // Restore focus and cursor position after React re-render
+      setTimeout(() => {
+        if (input) {
+          input.focus()
+          const newPos = before.length + (needSpaceBefore ? 1 : 0) + token.length + (needSpaceAfter ? 1 : 0)
+          input.setSelectionRange(newPos, newPos)
+        }
+      }, 0)
+    } else {
+      // No input ref, just append
+      const newFormula = current ? `${current} ${token}` : token
+      onUpdate({ default_qty_formula: newFormula || null })
+    }
+    setShowVarPicker(false)
+  }
 
   // Other items for "depends on" dropdown (exclude self)
   const otherItems = items.filter(i => i.id !== item.id)
@@ -589,24 +620,30 @@ function TemplateItemRow({
 
       {/* Formula */}
       <td className="px-3 py-2">
-        <div className="relative" ref={formulaHelpRef}>
+        <div className="relative" ref={varPickerRef}>
           <div className="flex items-center gap-1">
             <input
+              ref={formulaInputRef}
               value={item.default_qty_formula || ''}
               onChange={e => onUpdate({ default_qty_formula: e.target.value || null })}
               className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-mono"
-              placeholder="e.g. {area} / 100 * {waste}"
+              placeholder="Click {x} to build formula"
             />
             <button
-              onClick={() => setShowFormulaHelp(!showFormulaHelp)}
-              className="text-gray-400 hover:text-primary shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-xs font-bold border border-gray-300 hover:border-primary"
-              title="Formula reference"
+              onClick={() => setShowVarPicker(!showVarPicker)}
+              className="text-gray-500 hover:text-primary shrink-0 px-1.5 py-0.5 flex items-center justify-center rounded text-xs font-bold border border-gray-300 hover:border-primary font-mono"
+              title="Insert variable"
             >
-              ?
+              {'{x}'}
             </button>
           </div>
-          {showFormulaHelp && (
-            <FormulaHelpPopover trade={trade} onClose={() => setShowFormulaHelp(false)} />
+          {showVarPicker && (
+            <FormulaVariablePicker
+              trade={trade}
+              otherItems={otherItems}
+              onInsert={insertToken}
+              onClose={() => setShowVarPicker(false)}
+            />
           )}
         </div>
       </td>
@@ -690,51 +727,113 @@ function TemplateItemRow({
   )
 }
 
-// ---------- Formula Help Popover ----------
+// ---------- Formula Variable Picker ----------
 
-function FormulaHelpPopover({ trade, onClose }: { trade: string; onClose: () => void }) {
+function FormulaVariablePicker({
+  trade,
+  otherItems,
+  onInsert,
+  onClose,
+}: {
+  trade: string
+  otherItems: TemplateItem[]
+  onInsert: (token: string) => void
+  onClose: () => void
+}) {
   const vars = MEASUREMENT_VARIABLES[trade] || []
 
   return (
-    <div className="absolute z-50 top-full mt-1 left-0 w-80 bg-white rounded-xl border border-gray-200 shadow-xl p-4 text-xs">
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="font-semibold text-gray-900">Formula Variables</h4>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">&times;</button>
+    <div className="absolute z-50 top-full mt-1 left-0 w-80 bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden text-xs">
+      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
+        <h4 className="font-semibold text-gray-700">Insert Variable</h4>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm">&times;</button>
       </div>
 
-      {/* Trade-specific variables */}
-      {vars.length > 0 && (
-        <div className="mb-3">
-          <p className="font-medium text-gray-600 mb-1">{TRADES.find(t => t.key === trade)?.label} Measurements:</p>
-          <div className="flex flex-wrap gap-1">
+      <div className="max-h-72 overflow-y-auto">
+        {/* Hover Measurements */}
+        {vars.length > 0 && (
+          <div>
+            <div className="px-3 py-1.5 bg-blue-50 text-xs font-semibold text-blue-700 uppercase tracking-wider sticky top-0">
+              {TRADES.find(t => t.key === trade)?.label} Measurements
+            </div>
             {vars.map(v => (
-              <code key={v.key} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded" title={`${v.label} (${v.unit})`}>
-                {`{${v.key}}`}
-              </code>
+              <button
+                key={v.key}
+                onClick={() => onInsert(`{${v.key}}`)}
+                className="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between group transition-colors"
+              >
+                <div>
+                  <code className="text-blue-700 font-mono font-medium">{`{${v.key}}`}</code>
+                  <span className="text-gray-400 ml-2">{v.label}</span>
+                </div>
+                <span className="text-gray-400 text-xs">{v.unit}</span>
+              </button>
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Special variables */}
-      <div className="mb-3">
-        <p className="font-medium text-gray-600 mb-1">Special:</p>
-        <div className="space-y-1 text-gray-500">
-          <div><code className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded">{'{waste}'}</code> = waste factor (e.g. 1.15)</div>
-          <div><code className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded">{'{waste_pct}'}</code> = raw % (e.g. 15)</div>
-          <div><code className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded">{'{item:Description}'}</code> = another item&apos;s qty</div>
-          <div><code className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded">{'{self:hardie}'}</code> = 1 if Hardie, 0 otherwise</div>
+        {/* Waste variables */}
+        <div>
+          <div className="px-3 py-1.5 bg-purple-50 text-xs font-semibold text-purple-700 uppercase tracking-wider sticky top-0">
+            Waste &amp; Special
+          </div>
+          <button
+            onClick={() => onInsert('{waste}')}
+            className="w-full text-left px-3 py-2 hover:bg-purple-50 flex items-center justify-between transition-colors"
+          >
+            <div>
+              <code className="text-purple-700 font-mono font-medium">{'{waste}'}</code>
+              <span className="text-gray-400 ml-2">Waste factor (e.g. 1.15)</span>
+            </div>
+          </button>
+          <button
+            onClick={() => onInsert('{waste_pct}')}
+            className="w-full text-left px-3 py-2 hover:bg-purple-50 flex items-center justify-between transition-colors"
+          >
+            <div>
+              <code className="text-purple-700 font-mono font-medium">{'{waste_pct}'}</code>
+              <span className="text-gray-400 ml-2">Raw waste % (e.g. 15)</span>
+            </div>
+          </button>
         </div>
-      </div>
 
-      {/* Examples */}
-      <div>
-        <p className="font-medium text-gray-600 mb-1">Examples:</p>
-        <div className="space-y-1 font-mono text-gray-600">
-          <div>{'{area} / 100 * {waste}'}</div>
-          <div>{'({rakes} + {eaves}) / 116'}</div>
-          <div>{'{item:Shingles} / 15'}</div>
-          <div>{'({hips} + {ridges}) * 1.15 / 30'}</div>
+        {/* Other template items (for dependency references) */}
+        {otherItems.filter(i => i.description).length > 0 && (
+          <div>
+            <div className="px-3 py-1.5 bg-amber-50 text-xs font-semibold text-amber-700 uppercase tracking-wider sticky top-0">
+              Other Items (qty reference)
+            </div>
+            {otherItems.filter(i => i.description).map(other => (
+              <button
+                key={other.id}
+                onClick={() => onInsert(`{item:${other.description}}`)}
+                className="w-full text-left px-3 py-2 hover:bg-amber-50 flex items-center justify-between transition-colors"
+              >
+                <div>
+                  <code className="text-amber-700 font-mono font-medium">{`{item:${other.description}}`}</code>
+                </div>
+                <span className="text-gray-400 text-xs">{other.unit}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Operators */}
+        <div>
+          <div className="px-3 py-1.5 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider sticky top-0">
+            Operators
+          </div>
+          <div className="px-3 py-2 flex flex-wrap gap-1.5">
+            {['+', '-', '*', '/', '(', ')', '100', '15', '30'].map(op => (
+              <button
+                key={op}
+                onClick={() => onInsert(op)}
+                className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm font-mono font-medium text-gray-700 transition-colors"
+              >
+                {op}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

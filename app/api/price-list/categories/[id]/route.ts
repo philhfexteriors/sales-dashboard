@@ -12,9 +12,18 @@ export async function PUT(
   const { id } = await params
   const body = await request.json()
 
+  // Whitelist allowed fields
+  const { name, trade, section, sort_order, active } = body
+  const updates: Record<string, unknown> = {}
+  if (name !== undefined) updates.name = name
+  if (trade !== undefined) updates.trade = trade
+  if (section !== undefined) updates.section = section
+  if (sort_order !== undefined) updates.sort_order = sort_order
+  if (active !== undefined) updates.active = active
+
   const { data, error } = await supabase
     .from('price_list_categories')
-    .update(body)
+    .update(updates)
     .eq('id', id)
     .select()
     .single()

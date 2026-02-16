@@ -17,3 +17,7 @@ export function hasRole(userRole: UserRole | null | undefined, allowedRoles: Use
 export function canManageProducts(userRole: UserRole | null | undefined, email: string | null | undefined): boolean {
   return isAdmin(email) || hasRole(userRole, ['sales_manager'])
 }
+
+export function canManageUsers(email: string | null | undefined): boolean {
+  return isAdmin(email)
+}

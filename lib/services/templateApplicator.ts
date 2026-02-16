@@ -57,7 +57,6 @@ function topologicalSort(items: TemplateItemData[]): TemplateItemData[] {
     if (visited.has(item.id)) return
     if (visiting.has(item.id)) {
       // Circular dependency detected — break the cycle
-      console.warn(`Circular dependency detected for template item: "${item.description}"`)
       return
     }
 
@@ -106,25 +105,12 @@ export function applyTemplate(
   // Step 1: Build measurement context
   const wasteCalcInputs = measurements ? extractWasteCalcInputs(measurements) : null
 
-  // Diagnostic: log raw inputs to catch [object Object] issues
-  if (wasteCalcInputs) {
-    console.log('[applyTemplate] Raw WasteCalcInputs:', JSON.stringify(wasteCalcInputs, (key, val) => {
-      if (val !== null && typeof val === 'object' && !Array.isArray(val) && key !== '') {
-        return `[object: ${Object.keys(val).join(',')}]`
-      }
-      return val
-    }, 2))
-  }
-
   const measurementValues: Record<string, number> = wasteCalcInputs
     ? buildMeasurementContext(wasteCalcInputs)
     : {} // All measurements default to 0 when no Hover data
 
-  console.log('[applyTemplate] Measurement context:', JSON.stringify(measurementValues))
-
   // Step 2: Build waste factor
   const wasteFactor = (config.wastePct + 100) / 100
-  console.log('[applyTemplate] Waste factor:', wasteFactor, 'from', config.wastePct, '%')
 
   // Step 3: Topological sort items by dependency
   const sortedItems = topologicalSort(template.bid_template_items)
@@ -150,13 +136,7 @@ export function applyTemplate(
 
       const result = evaluateFormula(item.default_qty_formula, context)
 
-      if (result.error) {
-        console.warn(`[applyTemplate] Formula error for "${item.description}": ${result.error}`)
-        console.warn(`[applyTemplate]   Formula: ${item.default_qty_formula}`)
-        console.warn(`[applyTemplate]   Raw value: ${result.rawValue}, Final value: ${result.value}`)
-      } else {
-        console.log(`[applyTemplate] "${item.description}": ${item.default_qty_formula} => ${result.rawValue} => ceil(${result.value})`)
-      }
+      // Formula errors are non-fatal — we use 0 as fallback
 
       qty = result.value
       qtySource = 'formula'

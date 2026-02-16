@@ -9,9 +9,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params
   const body = await request.json()
 
+  // Whitelist allowed fields
+  const { label, start_date, end_date, active, sort_order } = body
+  const updates: Record<string, unknown> = {}
+  if (label !== undefined) updates.label = label
+  if (start_date !== undefined) updates.start_date = start_date
+  if (end_date !== undefined) updates.end_date = end_date
+  if (active !== undefined) updates.active = active
+  if (sort_order !== undefined) updates.sort_order = sort_order
+
   const { data, error } = await supabase
     .from('start_date_windows')
-    .update(body)
+    .update(updates)
     .eq('id', id)
     .select()
     .single()

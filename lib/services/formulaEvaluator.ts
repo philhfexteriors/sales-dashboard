@@ -140,13 +140,8 @@ export function evaluateFormula(formula: string, context: FormulaContext): Formu
   // Step 1: Replace tokens with values
   const { expression, error: tokenError } = resolveTokens(formula, context)
 
-  // Diagnostic: log the resolved expression
-  console.log(`[evaluateFormula] "${formula}" => "${expression}"`)
-
   // Safety check: if expression still contains '[object' it means an object leaked through
   if (expression.includes('[object')) {
-    console.error(`[evaluateFormula] Object leaked into expression! Formula: "${formula}", Expression: "${expression}"`)
-    console.error(`[evaluateFormula] Context measurements:`, JSON.stringify(context.measurements))
     return { value: 0, rawValue: 0, error: `Object leaked into expression (likely a Hover data structure issue). Raw: ${expression}` }
   }
 
@@ -159,60 +154,6 @@ export function evaluateFormula(formula: string, context: FormulaContext): Formu
   const value = Math.max(0, Math.ceil(rawValue))
 
   return { value, rawValue, error }
-}
-
-// ---------- Validation ----------
-
-/**
- * Validate a formula string without evaluating it.
- * Checks syntax and extracts referenced variables.
- */
-export function validateFormula(formula: string): {
-  valid: boolean
-  error: string | null
-  variables: string[]
-} {
-  if (!formula || !formula.trim()) {
-    return { valid: false, error: 'Empty formula', variables: [] }
-  }
-
-  const variables: string[] = []
-
-  // Extract all {variable} tokens
-  const tokenRegex = /\{([^}]+)\}/g
-  let match
-  while ((match = tokenRegex.exec(formula)) !== null) {
-    variables.push(match[1].trim())
-  }
-
-  // Replace tokens with dummy value (1) and check math syntax
-  const testExpression = formula.replace(/\{[^}]+\}/g, '1')
-  const cleaned = testExpression.replace(/\s+/g, '')
-
-  if (!/^[0-9.+\-*/()]+$/.test(cleaned)) {
-    return {
-      valid: false,
-      error: `Invalid characters in formula (after variable substitution): ${cleaned}`,
-      variables,
-    }
-  }
-
-  // Try evaluating with dummy values
-  try {
-    // eslint-disable-next-line no-new-func
-    const result = new Function(`return (${cleaned})`)()
-    if (typeof result !== 'number' || !isFinite(result)) {
-      return { valid: false, error: 'Formula does not produce a valid number', variables }
-    }
-  } catch (e) {
-    return {
-      valid: false,
-      error: `Syntax error: ${e instanceof Error ? e.message : 'unknown'}`,
-      variables,
-    }
-  }
-
-  return { valid: true, error: null, variables }
 }
 
 // ---------- Helpers ----------
@@ -256,16 +197,6 @@ export function buildMeasurementContext(inputs: WasteCalcInputs): Record<string,
     openingsTop: n(inputs.openingsTop),
     blockCount: n(inputs.blockCount),
     porchSoffit: n(inputs.porchSoffit),
-  }
-
-  // Validate: log warning if any value snuck through as non-number
-  if (typeof window !== 'undefined') {
-    for (const [key, val] of Object.entries(ctx)) {
-      if (typeof val !== 'number' || !isFinite(val)) {
-        console.error(`[buildMeasurementContext] Non-number in context: ${key} = ${typeof val} ${val}`)
-        ctx[key] = 0
-      }
-    }
   }
 
   return ctx

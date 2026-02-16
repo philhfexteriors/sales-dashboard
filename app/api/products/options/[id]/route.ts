@@ -9,9 +9,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params
   const body = await request.json()
 
+  // Whitelist allowed fields
+  const { name, parent_id, level, sort_order, active, notes } = body
+  const updates: Record<string, unknown> = {}
+  if (name !== undefined) updates.name = name
+  if (parent_id !== undefined) updates.parent_id = parent_id
+  if (level !== undefined) updates.level = level
+  if (sort_order !== undefined) updates.sort_order = sort_order
+  if (active !== undefined) updates.active = active
+  if (notes !== undefined) updates.notes = notes
+
   const { data, error } = await supabase
     .from('product_options')
-    .update(body)
+    .update(updates)
     .eq('id', id)
     .select()
     .single()

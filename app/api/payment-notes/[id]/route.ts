@@ -9,9 +9,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params
   const body = await request.json()
 
+  // Whitelist allowed fields
+  const { title, body: noteBody, active, sort_order } = body
+  const updates: Record<string, unknown> = {}
+  if (title !== undefined) updates.title = title
+  if (noteBody !== undefined) updates.body = noteBody
+  if (active !== undefined) updates.active = active
+  if (sort_order !== undefined) updates.sort_order = sort_order
+
   const { data, error } = await supabase
     .from('payment_note_templates')
-    .update(body)
+    .update(updates)
     .eq('id', id)
     .select()
     .single()

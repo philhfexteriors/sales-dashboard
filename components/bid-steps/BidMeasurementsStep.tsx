@@ -287,8 +287,8 @@ function SidingMeasurements({ measurements }: { measurements: HoverMeasurements 
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <h4 className="text-sm font-medium text-gray-700 mb-3">Openings</h4>
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <MeasurementValue label="Windows" value={String(measurements.openings.windows.length)} />
-            <MeasurementValue label="Doors" value={String(measurements.openings.doors.length)} />
+            <MeasurementValue label="Windows" value={String(measurements.openings?.windows?.length ?? 0)} />
+            <MeasurementValue label="Doors" value={String(measurements.openings?.doors?.length ?? 0)} />
           </div>
         </div>
       )}

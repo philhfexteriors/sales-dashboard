@@ -1,8 +1,5 @@
 import type { HoverMeasurements } from './hoverTypes'
 import { parseFacadeData } from './hoverTypes'
-import { calculateWaste, type WasteCalcConfig } from './wasteCalculator'
-import type { BidLineItem } from '@/components/BidFormProvider'
-import { calculateLineItemTotals } from '@/components/BidFormProvider'
 
 // Waste calculator input variables extracted from Hover measurements
 export interface WasteCalcInputs {
@@ -141,17 +138,7 @@ function extractRoofData(measurements: HoverMeasurements): {
   const m = measurements as any
   const roof = m.roof || m.roof_summary
 
-  // Diagnostic: log the roof structure
-  if (roof && typeof roof === 'object') {
-    console.log('[extractRoofData] Roof keys:', Object.keys(roof))
-    if (roof.measurements) console.log('[extractRoofData] roof.measurements keys:', Object.keys(roof.measurements))
-    if (roof.area) console.log('[extractRoofData] roof.area:', JSON.stringify(roof.area).slice(0, 200))
-  } else {
-    console.log('[extractRoofData] No roof key found. Top-level keys:', Object.keys(measurements))
-  }
-
   if (!roof || typeof roof !== 'object') {
-    console.log('[extractRoofData] Returning all zeros (no roof data)')
     return { area: 0, ridges: 0, hips: 0, valleys: 0, rakes: 0, eaves: 0 }
   }
 
@@ -185,87 +172,6 @@ function extractRoofData(measurements: HoverMeasurements): {
   // Hover uses "gutters_eaves" for eave linear footage
   const eaves = toNum(meas.eaves) || toNum(meas.gutters_eaves) || toNum(meas.eave_length)
 
-  const result = { area, ridges, hips, valleys, rakes, eaves }
-  console.log('[extractRoofData] Extracted result:', JSON.stringify(result))
-  return result
+  return { area, ridges, hips, valleys, rakes, eaves }
 }
 
-/**
- * Get a summary of what Hover data is available vs what needs manual input.
- */
-export function getMeasurementCoverage(inputs: WasteCalcInputs): {
-  available: string[]
-  needsManualInput: string[]
-} {
-  const available: string[] = []
-  const needsManualInput: string[] = []
-
-  // Check each field group
-  if (inputs.area > 0) available.push('Roof Area')
-  else needsManualInput.push('Roof Area')
-
-  if (inputs.ridges > 0) available.push('Ridges')
-  else needsManualInput.push('Ridges')
-
-  if (inputs.eaves > 0) available.push('Eaves')
-  else needsManualInput.push('Eaves')
-
-  if (inputs.rakes > 0) available.push('Rakes')
-  else needsManualInput.push('Rakes')
-
-  if (inputs.sidingArea > 0) available.push('Siding Area')
-  else needsManualInput.push('Siding Area')
-
-  if (inputs.openingsPerimeter > 0) available.push('Openings Perimeter')
-  else needsManualInput.push('Openings Perimeter')
-
-  if (inputs.outsideCorners > 0) available.push('Outside Corners')
-  else needsManualInput.push('Outside Corners')
-
-  // Always manual
-  needsManualInput.push('Flashing', 'Step Flashing', 'Ridge Vent', 'Steep Fee Areas')
-  needsManualInput.push('Trim lengths', 'Soffit SF', 'Porch Soffit')
-
-  return { available, needsManualInput }
-}
-
-/**
- * Apply the waste calculator to Hover measurements and produce BidLineItem[].
- * This is the main orchestration function called from the bid wizard.
- *
- * @param measurements - Raw Hover measurement JSON
- * @param config - Waste calculator configuration (waste %, material variant)
- * @param trade - Trade type (roof, siding, gutters, fascia_soffit)
- * @param defaultMarginPct - Default margin percentage from the bid
- * @returns BidLineItem[] ready to be passed to setLineItems()
- */
-export function applyWasteCalculator(
-  measurements: HoverMeasurements,
-  config: WasteCalcConfig,
-  trade: string,
-  defaultMarginPct: number
-): BidLineItem[] {
-  const inputs = extractWasteCalcInputs(measurements)
-  const outputs = calculateWaste(inputs, config, trade)
-
-  return outputs.map((output, index) => {
-    const item: BidLineItem = {
-      price_list_id: null,
-      section: output.section,
-      description: output.description,
-      qty: output.qty,
-      unit: output.unit,
-      unit_price: 0,
-      margin_pct: defaultMarginPct,
-      total_price: 0,
-      total_margin: 0,
-      line_total: 0,
-      is_taxable: output.section === 'materials',
-      sort_order: index,
-      notes: null,
-      qty_source: 'formula',
-      qty_formula: output.formula,
-    }
-    return calculateLineItemTotals(item)
-  })
-}

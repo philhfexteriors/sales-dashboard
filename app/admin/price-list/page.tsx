@@ -623,20 +623,37 @@ interface ItemSectionProps {
 function ItemSection({ title, sectionKey, items, categories, selectedCategoryId, showAddForm, onOpenAddForm, onCloseAddForm, newItem, onNewItemChange, onAddItem, ...props }: ItemSectionProps) {
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-        {!showAddForm && (
-          <button
-            onClick={onOpenAddForm}
-            className="text-primary hover:text-primary-dark text-sm font-medium transition-colors"
-          >
-            + Add {title} Item
-          </button>
-        )}
-      </div>
+      <h2 className="text-lg font-semibold text-gray-900 mb-3">{title}</h2>
 
-      {showAddForm && (
-        <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+      {items.length === 0 && !showAddForm && (
+        <p className="text-sm text-gray-500 py-4">No {title.toLowerCase()} items{selectedCategoryId ? ' in this category' : ''} yet.</p>
+      )}
+
+      {items.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-3">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left">
+                <th className="px-3 py-3 font-medium text-gray-500 w-8"></th>
+                <th className="px-3 py-3 font-medium text-gray-500">Brand</th>
+                <th className="px-3 py-3 font-medium text-gray-500">Description</th>
+                <th className="px-3 py-3 font-medium text-gray-500">Unit</th>
+                <th className="px-3 py-3 font-medium text-gray-500 text-right">Price</th>
+                <th className="px-3 py-3 font-medium text-gray-500 text-center">Tax</th>
+                <th className="px-3 py-3 font-medium text-gray-500 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {items.map(item => (
+                <ItemRow key={item.id} item={item} categories={categories} {...props} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showAddForm ? (
+        <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
           <h3 className="font-medium text-gray-900 mb-3 text-sm">Add {title} Item</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
@@ -678,32 +695,14 @@ function ItemSection({ title, sectionKey, items, categories, selectedCategoryId,
             </div>
           </div>
         </div>
+      ) : (
+        <button
+          onClick={onOpenAddForm}
+          className="px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm font-medium text-gray-500 hover:border-primary hover:text-primary transition-colors w-full"
+        >
+          + Add {title} Item
+        </button>
       )}
-
-      {items.length === 0 && !showAddForm ? (
-        <p className="text-sm text-gray-500 py-4">No {title.toLowerCase()} items{selectedCategoryId ? ' in this category' : ''} yet.</p>
-      ) : items.length > 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-left">
-                <th className="px-3 py-3 font-medium text-gray-500 w-8"></th>
-                <th className="px-3 py-3 font-medium text-gray-500">Brand</th>
-                <th className="px-3 py-3 font-medium text-gray-500">Description</th>
-                <th className="px-3 py-3 font-medium text-gray-500">Unit</th>
-                <th className="px-3 py-3 font-medium text-gray-500 text-right">Price</th>
-                <th className="px-3 py-3 font-medium text-gray-500 text-center">Tax</th>
-                <th className="px-3 py-3 font-medium text-gray-500 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {items.map(item => (
-                <ItemRow key={item.id} item={item} categories={categories} {...props} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
     </div>
   )
 }

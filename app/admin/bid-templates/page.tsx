@@ -452,36 +452,20 @@ function TemplateCard({
               No items yet. Click &ldquo;+ Add Item&rdquo; to start building this template.
             </div>
           ) : (
-            <div>
-              <table className="w-full text-sm min-w-[900px]">
-                <thead>
-                  <tr className="bg-gray-50 text-left">
-                    <th className="px-3 py-2 font-medium text-gray-500" style={{ width: 110 }}>Section</th>
-                    <th className="px-3 py-2 font-medium text-gray-500">Description</th>
-                    <th className="px-3 py-2 font-medium text-gray-500" style={{ width: 70 }}>Unit</th>
-                    <th className="px-3 py-2 font-medium text-gray-500" style={{ width: 260 }}>Formula</th>
-                    <th className="px-3 py-2 font-medium text-gray-500" style={{ width: 90 }}>Fallback Qty</th>
-                    <th className="px-3 py-2 font-medium text-gray-500" style={{ width: 150 }}>Depends On</th>
-                    <th className="px-3 py-2 font-medium text-gray-500" style={{ width: 120 }}>Price List</th>
-                    <th className="px-3 py-2" style={{ width: 40 }}></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {items.map((item, index) => (
-                    <TemplateItemRow
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      items={items}
-                      trade={trade}
-                      priceListItems={priceListItems}
-                      onUpdate={(updates) => updateItem(index, updates)}
-                      onLinkPriceList={(pl) => linkPriceList(index, pl)}
-                      onRemove={() => removeItem(index)}
-                    />
-                  ))}
-                </tbody>
-              </table>
+            <div className="divide-y divide-gray-100">
+              {items.map((item, index) => (
+                <TemplateItemRow
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  items={items}
+                  trade={trade}
+                  priceListItems={priceListItems}
+                  onUpdate={(updates) => updateItem(index, updates)}
+                  onLinkPriceList={(pl) => linkPriceList(index, pl)}
+                  onRemove={() => removeItem(index)}
+                />
+              ))}
             </div>
           )}
 
@@ -551,7 +535,6 @@ function TemplateItemRow({
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (showVarPicker && varButtonRef.current && !varButtonRef.current.contains(e.target as Node)) {
-        // Check if click is inside the portal dropdown
         const portal = document.getElementById('formula-var-picker')
         if (portal && portal.contains(e.target as Node)) return
         setShowVarPicker(false)
@@ -578,14 +561,12 @@ function TemplateItemRow({
     if (input) {
       const start = input.selectionStart ?? current.length
       const end = input.selectionEnd ?? current.length
-      // Add spaces around token if needed
       const before = current.slice(0, start)
       const after = current.slice(end)
       const needSpaceBefore = before.length > 0 && !before.endsWith(' ') && !before.endsWith('(')
       const needSpaceAfter = after.length > 0 && !after.startsWith(' ') && !after.startsWith(')')
       const newFormula = before + (needSpaceBefore ? ' ' : '') + token + (needSpaceAfter ? ' ' : '') + after
       onUpdate({ default_qty_formula: newFormula || null })
-      // Restore focus and cursor position after React re-render
       setTimeout(() => {
         if (input) {
           input.focus()
@@ -594,7 +575,6 @@ function TemplateItemRow({
         }
       }, 0)
     } else {
-      // No input ref, just append
       const newFormula = current ? `${current} ${token}` : token
       onUpdate({ default_qty_formula: newFormula || null })
     }
@@ -605,48 +585,85 @@ function TemplateItemRow({
   const otherItems = items.filter(i => i.id !== item.id)
 
   return (
-    <tr className="hover:bg-gray-50 group align-top">
-      {/* Section */}
-      <td className="px-3 py-2">
+    <div className="px-4 py-3 hover:bg-gray-50 group">
+      {/* Row 1: Section, Description, Unit, Price List, Remove */}
+      <div className="flex items-center gap-2">
         <select
           value={item.section}
           onChange={e => onUpdate({ section: e.target.value })}
-          className="w-full px-2 py-1 border border-gray-200 rounded text-sm"
+          className="px-2 py-1.5 border border-gray-200 rounded text-sm shrink-0 w-24"
         >
-          <option value="materials">Materials</option>
+          <option value="materials">Material</option>
           <option value="labor">Labor</option>
         </select>
-      </td>
 
-      {/* Description */}
-      <td className="px-3 py-2">
         <input
           value={item.description}
           onChange={e => onUpdate({ description: e.target.value })}
-          className="w-full px-2 py-1 border border-gray-200 rounded text-sm"
+          className="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded text-sm"
           placeholder="Item description"
         />
-      </td>
 
-      {/* Unit */}
-      <td className="px-3 py-2">
         <select
           value={item.unit}
           onChange={e => onUpdate({ unit: e.target.value })}
-          className="w-full px-2 py-1 border border-gray-200 rounded text-sm"
+          className="px-2 py-1.5 border border-gray-200 rounded text-sm shrink-0 w-16"
         >
           {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
         </select>
-      </td>
 
-      {/* Formula */}
-      <td className="px-3 py-2">
-        <div className="flex items-center gap-1">
+        <div className="relative shrink-0" ref={priceSearchRef}>
+          {item.price_list ? (
+            <div className="flex items-center gap-1 px-2 py-1.5 bg-green-50 border border-green-200 rounded text-xs text-green-800">
+              <span title={`${item.price_list.description} - $${item.price_list.unit_price}/${item.price_list.unit}`}>
+                ${item.price_list.unit_price}/{item.price_list.unit}
+              </span>
+              <button
+                onClick={() => onUpdate({ price_list: null })}
+                className="text-green-500 hover:text-red-500 ml-0.5"
+                title="Unlink"
+              >
+                &times;
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowPriceSearch(!showPriceSearch)}
+              className="px-2 py-1.5 text-xs text-primary font-medium border border-dashed border-gray-300 rounded hover:border-primary"
+            >
+              Link Price
+            </button>
+          )}
+          {showPriceSearch && (
+            <PriceListSearchPopover
+              items={priceListItems}
+              section={item.section}
+              onSelect={(pl) => { onLinkPriceList(pl); setShowPriceSearch(false) }}
+              onClose={() => setShowPriceSearch(false)}
+            />
+          )}
+        </div>
+
+        <button
+          onClick={onRemove}
+          className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity shrink-0 p-1"
+          title="Remove item"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Row 2: Formula, Fallback Qty, Depends On */}
+      <div className="flex items-center gap-2 mt-2 ml-26">
+        <label className="text-xs text-gray-400 shrink-0">Formula</label>
+        <div className="flex items-center gap-1 flex-1 min-w-0">
           <input
             ref={formulaInputRef}
             value={item.default_qty_formula || ''}
             onChange={e => onUpdate({ default_qty_formula: e.target.value || null })}
-            className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-mono"
+            className="flex-1 min-w-0 px-2 py-1 border border-gray-200 rounded text-xs font-mono"
             placeholder="Click {x} to build"
           />
           <button
@@ -672,26 +689,22 @@ function TemplateItemRow({
           />,
           document.body
         )}
-      </td>
 
-      {/* Fallback Qty (used when no formula) */}
-      <td className="px-3 py-2">
+        <label className="text-xs text-gray-400 shrink-0 ml-2">Qty</label>
         <input
           type="number"
           step="0.01"
           value={item.default_qty ?? ''}
           onChange={e => onUpdate({ default_qty: e.target.value ? parseFloat(e.target.value) : null })}
-          className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-right"
+          className="w-16 px-2 py-1 border border-gray-200 rounded text-sm text-right shrink-0"
           placeholder="—"
         />
-      </td>
 
-      {/* Depends On */}
-      <td className="px-3 py-2">
+        <label className="text-xs text-gray-400 shrink-0 ml-2">Depends</label>
         <select
           value={item.depends_on_item_id || ''}
           onChange={e => onUpdate({ depends_on_item_id: e.target.value || null })}
-          className="w-full px-1 py-1 border border-gray-200 rounded text-xs truncate"
+          className="w-36 px-1 py-1 border border-gray-200 rounded text-xs truncate shrink-0"
         >
           <option value="">None</option>
           {otherItems.map(other => (
@@ -700,56 +713,8 @@ function TemplateItemRow({
             </option>
           ))}
         </select>
-      </td>
-
-      {/* Price List */}
-      <td className="px-3 py-2">
-        <div className="relative" ref={priceSearchRef}>
-          {item.price_list ? (
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-700 truncate" title={`${item.price_list.description} - $${item.price_list.unit_price}/${item.price_list.unit}`}>
-                ${item.price_list.unit_price}/{item.price_list.unit}
-              </span>
-              <button
-                onClick={() => onUpdate({ price_list: null })}
-                className="text-gray-400 hover:text-red-500 shrink-0 text-xs"
-                title="Unlink"
-              >
-                x
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowPriceSearch(!showPriceSearch)}
-              className="text-xs text-primary font-medium"
-            >
-              Link
-            </button>
-          )}
-          {showPriceSearch && (
-            <PriceListSearchPopover
-              items={priceListItems}
-              section={item.section}
-              onSelect={(pl) => { onLinkPriceList(pl); setShowPriceSearch(false) }}
-              onClose={() => setShowPriceSearch(false)}
-            />
-          )}
-        </div>
-      </td>
-
-      {/* Actions */}
-      <td className="px-3 py-2">
-        <button
-          onClick={onRemove}
-          className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity"
-          title="Remove item"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
-      </td>
-    </tr>
+      </div>
+    </div>
   )
 }
 
@@ -921,9 +886,9 @@ function AddTemplateItemPicker({
       </button>
 
       {open && (
-        <div className="absolute z-50 bottom-full mb-1 left-4 w-96 bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden">
+        <div className="absolute z-50 bottom-full mb-1 left-4 right-4 sm:right-auto sm:w-96 bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden max-h-[min(420px,50vh)] flex flex-col">
           {/* Search */}
-          <div className="p-3 border-b border-gray-100">
+          <div className="p-3 border-b border-gray-100 shrink-0">
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -934,7 +899,7 @@ function AddTemplateItemPicker({
           </div>
 
           {/* Items grouped by section */}
-          <div className="max-h-72 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto">
             {filtered.length === 0 ? (
               <p className="text-sm text-gray-500 p-4 text-center">
                 {search ? 'No matching items' : 'No catalog items for this trade'}
@@ -957,7 +922,7 @@ function AddTemplateItemPicker({
                         className="w-full text-left px-4 py-2.5 hover:bg-primary/5 flex items-center justify-between group transition-colors"
                       >
                         <div className="min-w-0">
-                          <div className="text-sm text-gray-900 group-hover:text-primary">{item.description}</div>
+                          <div className="text-sm text-gray-900 group-hover:text-primary truncate">{item.description}</div>
                           <div className="text-xs text-gray-400">{item.brand && `${item.brand} · `}{item.unit}</div>
                         </div>
                         <span className="text-sm font-medium text-gray-700 ml-4 shrink-0">
@@ -983,7 +948,7 @@ function AddTemplateItemPicker({
                         className="w-full text-left px-4 py-2.5 hover:bg-primary/5 flex items-center justify-between group transition-colors"
                       >
                         <div className="min-w-0">
-                          <div className="text-sm text-gray-900 group-hover:text-primary">{item.description}</div>
+                          <div className="text-sm text-gray-900 group-hover:text-primary truncate">{item.description}</div>
                           <div className="text-xs text-gray-400">{item.brand && `${item.brand} · `}{item.unit}</div>
                         </div>
                         <span className="text-sm font-medium text-gray-700 ml-4 shrink-0">
@@ -998,7 +963,7 @@ function AddTemplateItemPicker({
           </div>
 
           {/* Custom item option */}
-          <div className="border-t border-gray-100 p-2">
+          <div className="border-t border-gray-100 p-2 shrink-0">
             <button
               onClick={() => { onCustom(); setOpen(false); setSearch('') }}
               className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"

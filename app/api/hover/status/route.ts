@@ -10,5 +10,7 @@ export async function GET() {
   const configured = isHoverConfigured()
   const connected = configured ? await isHoverConnected() : false
 
+  console.log('[hover/status] HOVER_CLIENT_ID set:', !!process.env.HOVER_CLIENT_ID, '| HOVER_CLIENT_SECRET set:', !!process.env.HOVER_CLIENT_SECRET, '| configured:', configured, '| connected:', connected)
+
   return NextResponse.json({ configured, connected })
 }

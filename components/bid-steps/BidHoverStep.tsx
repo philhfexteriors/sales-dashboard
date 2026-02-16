@@ -21,8 +21,21 @@ export default function BidHoverStep() {
   // Check Hover connection status
   useEffect(() => {
     fetch('/api/hover/status')
-      .then(r => r.json())
-      .then(setStatus)
+      .then(r => {
+        if (!r.ok) {
+          console.warn('[HoverStep] Status API returned', r.status)
+          return { configured: false, connected: false }
+        }
+        return r.json()
+      })
+      .then(data => {
+        if (data.configured !== undefined) {
+          setStatus(data)
+        } else {
+          console.warn('[HoverStep] Unexpected response:', data)
+          setStatus({ configured: false, connected: false })
+        }
+      })
       .catch(() => setStatus({ configured: false, connected: false }))
       .finally(() => setStatusLoading(false))
   }, [])

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
+import ReactDOM from 'react-dom'
 import AppShell from '@/components/AppShell'
 import RoleGuard from '@/components/RoleGuard'
 import Loading from '@/components/Loading'
@@ -451,18 +452,18 @@ function TemplateCard({
               No items yet. Click &ldquo;+ Add Item&rdquo; to start building this template.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div>
+              <table className="w-full text-sm min-w-[900px]">
                 <thead>
                   <tr className="bg-gray-50 text-left">
-                    <th className="px-3 py-2 font-medium text-gray-500 w-28">Section</th>
-                    <th className="px-3 py-2 font-medium text-gray-500 min-w-[180px]">Description</th>
-                    <th className="px-3 py-2 font-medium text-gray-500 w-20">Unit</th>
-                    <th className="px-3 py-2 font-medium text-gray-500 min-w-[200px]">Formula</th>
-                    <th className="px-3 py-2 font-medium text-gray-500 w-24">Fallback Qty</th>
-                    <th className="px-3 py-2 font-medium text-gray-500 w-36">Depends On</th>
-                    <th className="px-3 py-2 font-medium text-gray-500 w-32">Price List</th>
-                    <th className="px-3 py-2 w-10"></th>
+                    <th className="px-3 py-2 font-medium text-gray-500" style={{ width: 110 }}>Section</th>
+                    <th className="px-3 py-2 font-medium text-gray-500">Description</th>
+                    <th className="px-3 py-2 font-medium text-gray-500" style={{ width: 70 }}>Unit</th>
+                    <th className="px-3 py-2 font-medium text-gray-500" style={{ width: 260 }}>Formula</th>
+                    <th className="px-3 py-2 font-medium text-gray-500" style={{ width: 90 }}>Fallback Qty</th>
+                    <th className="px-3 py-2 font-medium text-gray-500" style={{ width: 150 }}>Depends On</th>
+                    <th className="px-3 py-2 font-medium text-gray-500" style={{ width: 120 }}>Price List</th>
+                    <th className="px-3 py-2" style={{ width: 40 }}></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -532,23 +533,43 @@ function TemplateItemRow({
 }) {
   const [showVarPicker, setShowVarPicker] = useState(false)
   const [showPriceSearch, setShowPriceSearch] = useState(false)
-  const varPickerRef = useRef<HTMLDivElement>(null)
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null)
+  const varButtonRef = useRef<HTMLButtonElement>(null)
   const priceSearchRef = useRef<HTMLDivElement>(null)
   const formulaInputRef = useRef<HTMLInputElement>(null)
 
-  // Close popovers on outside click
+  // Calculate position when opening the var picker
+  const toggleVarPicker = () => {
+    if (!showVarPicker && varButtonRef.current) {
+      const rect = varButtonRef.current.getBoundingClientRect()
+      setPickerPos({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 330) })
+    }
+    setShowVarPicker(!showVarPicker)
+  }
+
+  // Close popovers on outside click or scroll
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (varPickerRef.current && !varPickerRef.current.contains(e.target as Node)) {
+      if (showVarPicker && varButtonRef.current && !varButtonRef.current.contains(e.target as Node)) {
+        // Check if click is inside the portal dropdown
+        const portal = document.getElementById('formula-var-picker')
+        if (portal && portal.contains(e.target as Node)) return
         setShowVarPicker(false)
       }
       if (priceSearchRef.current && !priceSearchRef.current.contains(e.target as Node)) {
         setShowPriceSearch(false)
       }
     }
+    function handleScroll() {
+      if (showVarPicker) setShowVarPicker(false)
+    }
     document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+    window.addEventListener('scroll', handleScroll, true)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [showVarPicker])
 
   // Insert a token into the formula at cursor position
   const insertToken = (token: string) => {
@@ -620,32 +641,37 @@ function TemplateItemRow({
 
       {/* Formula */}
       <td className="px-3 py-2">
-        <div className="relative" ref={varPickerRef}>
-          <div className="flex items-center gap-1">
-            <input
-              ref={formulaInputRef}
-              value={item.default_qty_formula || ''}
-              onChange={e => onUpdate({ default_qty_formula: e.target.value || null })}
-              className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-mono"
-              placeholder="Click {x} to build formula"
-            />
-            <button
-              onClick={() => setShowVarPicker(!showVarPicker)}
-              className="text-gray-500 hover:text-primary shrink-0 px-1.5 py-0.5 flex items-center justify-center rounded text-xs font-bold border border-gray-300 hover:border-primary font-mono"
-              title="Insert variable"
-            >
-              {'{x}'}
-            </button>
-          </div>
-          {showVarPicker && (
-            <FormulaVariablePicker
-              trade={trade}
-              otherItems={otherItems}
-              onInsert={insertToken}
-              onClose={() => setShowVarPicker(false)}
-            />
-          )}
+        <div className="flex items-center gap-1">
+          <input
+            ref={formulaInputRef}
+            value={item.default_qty_formula || ''}
+            onChange={e => onUpdate({ default_qty_formula: e.target.value || null })}
+            className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-mono"
+            placeholder="Click {x} to build"
+          />
+          <button
+            ref={varButtonRef}
+            onClick={toggleVarPicker}
+            className={`shrink-0 px-1.5 py-0.5 flex items-center justify-center rounded text-xs font-bold border font-mono transition-colors ${
+              showVarPicker
+                ? 'text-primary border-primary bg-primary/5'
+                : 'text-gray-500 border-gray-300 hover:text-primary hover:border-primary'
+            }`}
+            title="Insert variable"
+          >
+            {'{x}'}
+          </button>
         </div>
+        {showVarPicker && pickerPos && ReactDOM.createPortal(
+          <FormulaVariablePicker
+            trade={trade}
+            otherItems={otherItems}
+            onInsert={insertToken}
+            onClose={() => setShowVarPicker(false)}
+            style={{ position: 'fixed', top: pickerPos.top, left: pickerPos.left }}
+          />,
+          document.body
+        )}
       </td>
 
       {/* Fallback Qty (used when no formula) */}
@@ -734,16 +760,22 @@ function FormulaVariablePicker({
   otherItems,
   onInsert,
   onClose,
+  style,
 }: {
   trade: string
   otherItems: TemplateItem[]
   onInsert: (token: string) => void
   onClose: () => void
+  style?: React.CSSProperties
 }) {
   const vars = MEASUREMENT_VARIABLES[trade] || []
 
   return (
-    <div className="absolute z-50 top-full mt-1 left-0 w-80 bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden text-xs">
+    <div
+      id="formula-var-picker"
+      className="z-[9999] w-80 bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden text-xs"
+      style={style}
+    >
       <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
         <h4 className="font-semibold text-gray-700">Insert Variable</h4>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm">&times;</button>

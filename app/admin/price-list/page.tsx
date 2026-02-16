@@ -72,14 +72,13 @@ export default function ProductCatalogAdmin() {
   const [variantsLoading, setVariantsLoading] = useState(false)
   const [newVariantNames, setNewVariantNames] = useState<Record<string, string>>({})
 
-  // Add item form
-  const [showAddForm, setShowAddForm] = useState(false)
+  // Add item form — tracks which section the form is open for (null = closed)
+  const [addingToSection, setAddingToSection] = useState<'materials' | 'labor' | null>(null)
   const [newItem, setNewItem] = useState({
     brand: '',
     description: '',
     unit: 'EA',
     unit_price: 0,
-    section: 'materials' as 'materials' | 'labor',
     is_taxable: false,
     notes: '',
     category_id: null as string | null,
@@ -228,7 +227,7 @@ export default function ProductCatalogAdmin() {
   }
 
   async function addItem() {
-    if (!newItem.description) {
+    if (!newItem.description || !addingToSection) {
       toast.error('Description is required')
       return
     }
@@ -238,6 +237,7 @@ export default function ProductCatalogAdmin() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...newItem,
+          section: addingToSection,
           trade: activeTrade,
           sort_order: items.length,
           category_id: newItem.category_id || selectedCategoryId === 'uncategorized' ? null : (newItem.category_id || selectedCategoryId || null),
@@ -245,14 +245,24 @@ export default function ProductCatalogAdmin() {
       })
       if (res.ok) {
         toast.success('Item added')
-        setShowAddForm(false)
-        setNewItem({ brand: '', description: '', unit: 'EA', unit_price: 0, section: 'materials', is_taxable: false, notes: '', category_id: null })
+        setAddingToSection(null)
+        setNewItem({ brand: '', description: '', unit: 'EA', unit_price: 0, is_taxable: false, notes: '', category_id: null })
         fetchItems()
       } else {
         const err = await res.json()
         toast.error(err.error || 'Failed to add')
       }
     } catch { toast.error('Failed to add') }
+  }
+
+  function openAddForm(section: 'materials' | 'labor') {
+    setAddingToSection(section)
+    setNewItem({ brand: '', description: '', unit: 'EA', unit_price: 0, is_taxable: false, notes: '', category_id: null })
+  }
+
+  function closeAddForm() {
+    setAddingToSection(null)
+    setNewItem({ brand: '', description: '', unit: 'EA', unit_price: 0, is_taxable: false, notes: '', category_id: null })
   }
 
   // --- Variant actions ---
@@ -328,17 +338,9 @@ export default function ProductCatalogAdmin() {
     <RoleGuard allowedRoles={['admin', 'sales_manager']}>
       <AppShell>
         <div className="p-6 max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Product Catalog</h1>
-              <p className="text-sm text-gray-500 mt-1">Manage materials, labor, pricing, and variants</p>
-            </div>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition-colors"
-            >
-              + Add Item
-            </button>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">Product Catalog</h1>
+            <p className="text-sm text-gray-500 mt-1">Manage materials, labor, pricing, and variants</p>
           </div>
 
           {/* Trade tabs */}
@@ -357,59 +359,6 @@ export default function ProductCatalogAdmin() {
               </button>
             ))}
           </div>
-
-          {/* Add item form */}
-          {showAddForm && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-              <h3 className="font-medium text-gray-900 mb-3">Add New Item</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Section</label>
-                  <select value={newItem.section} onChange={e => setNewItem({ ...newItem, section: e.target.value as 'materials' | 'labor' })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="materials">Materials</option>
-                    <option value="labor">Labor</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
-                  <select value={newItem.category_id || ''} onChange={e => setNewItem({ ...newItem, category_id: e.target.value || null })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="">Uncategorized</option>
-                    {categories.filter(c => c.active).map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Brand</label>
-                  <input value={newItem.brand} onChange={e => setNewItem({ ...newItem, brand: e.target.value })} placeholder="e.g., CertainTeed, GAF, OC" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
-                  <input value={newItem.description} onChange={e => setNewItem({ ...newItem, description: e.target.value })} placeholder="e.g., Landmark Pro Shingles" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Unit</label>
-                  <select value={newItem.unit} onChange={e => setNewItem({ ...newItem, unit: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Unit Price</label>
-                  <input type="number" step="0.01" value={newItem.unit_price} onChange={e => setNewItem({ ...newItem, unit_price: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                </div>
-                <div className="flex items-end gap-2">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={newItem.is_taxable} onChange={e => setNewItem({ ...newItem, is_taxable: e.target.checked })} className="rounded" />
-                    Taxable
-                  </label>
-                </div>
-                <div className="flex items-end gap-2">
-                  <button onClick={addItem} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium">Add</button>
-                  <button onClick={() => setShowAddForm(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {loading ? (
             <Loading message="Loading catalog..." />
@@ -566,6 +515,7 @@ export default function ProductCatalogAdmin() {
               <div className="md:col-span-3 space-y-8">
                 <ItemSection
                   title="Materials"
+                  sectionKey="materials"
                   items={materialItems}
                   categories={categories}
                   selectedCategoryId={selectedCategoryId}
@@ -585,9 +535,16 @@ export default function ProductCatalogAdmin() {
                   onAddVariant={addVariant}
                   onToggleVariantActive={toggleVariantActive}
                   onDeleteVariant={deleteVariant}
+                  showAddForm={addingToSection === 'materials'}
+                  onOpenAddForm={() => openAddForm('materials')}
+                  onCloseAddForm={closeAddForm}
+                  newItem={newItem}
+                  onNewItemChange={setNewItem}
+                  onAddItem={addItem}
                 />
                 <ItemSection
                   title="Labor"
+                  sectionKey="labor"
                   items={laborItems}
                   categories={categories}
                   selectedCategoryId={selectedCategoryId}
@@ -607,6 +564,12 @@ export default function ProductCatalogAdmin() {
                   onAddVariant={addVariant}
                   onToggleVariantActive={toggleVariantActive}
                   onDeleteVariant={deleteVariant}
+                  showAddForm={addingToSection === 'labor'}
+                  onOpenAddForm={() => openAddForm('labor')}
+                  onCloseAddForm={closeAddForm}
+                  newItem={newItem}
+                  onNewItemChange={setNewItem}
+                  onAddItem={addItem}
                 />
               </div>
             </div>
@@ -617,8 +580,19 @@ export default function ProductCatalogAdmin() {
   )
 }
 
+interface NewItemData {
+  brand: string
+  description: string
+  unit: string
+  unit_price: number
+  is_taxable: boolean
+  notes: string
+  category_id: string | null
+}
+
 interface ItemSectionProps {
   title: string
+  sectionKey: 'materials' | 'labor'
   items: PriceListItem[]
   categories: Category[]
   selectedCategoryId: string | null
@@ -638,15 +612,77 @@ interface ItemSectionProps {
   onAddVariant: (itemId: string, variantGroup: string) => void
   onToggleVariantActive: (v: Variant) => void
   onDeleteVariant: (v: Variant) => void
+  showAddForm: boolean
+  onOpenAddForm: () => void
+  onCloseAddForm: () => void
+  newItem: NewItemData
+  onNewItemChange: (data: NewItemData) => void
+  onAddItem: () => void
 }
 
-function ItemSection({ title, items, categories, selectedCategoryId, ...props }: ItemSectionProps) {
+function ItemSection({ title, sectionKey, items, categories, selectedCategoryId, showAddForm, onOpenAddForm, onCloseAddForm, newItem, onNewItemChange, onAddItem, ...props }: ItemSectionProps) {
   return (
     <div>
-      <h2 className="text-lg font-semibold text-gray-900 mb-3">{title}</h2>
-      {items.length === 0 ? (
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        {!showAddForm && (
+          <button
+            onClick={onOpenAddForm}
+            className="text-primary hover:text-primary-dark text-sm font-medium transition-colors"
+          >
+            + Add {title} Item
+          </button>
+        )}
+      </div>
+
+      {showAddForm && (
+        <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+          <h3 className="font-medium text-gray-900 mb-3 text-sm">Add {title} Item</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+              <select value={newItem.category_id || ''} onChange={e => onNewItemChange({ ...newItem, category_id: e.target.value || null })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <option value="">Uncategorized</option>
+                {categories.filter(c => c.active).map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Brand</label>
+              <input value={newItem.brand} onChange={e => onNewItemChange({ ...newItem, brand: e.target.value })} placeholder="e.g., CertainTeed, GAF, OC" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
+              <input value={newItem.description} onChange={e => onNewItemChange({ ...newItem, description: e.target.value })} placeholder={sectionKey === 'materials' ? 'e.g., Landmark Pro Shingles' : 'e.g., Tear Off (per SQ)'} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Unit</label>
+              <select value={newItem.unit} onChange={e => onNewItemChange({ ...newItem, unit: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Unit Price</label>
+              <input type="number" step="0.01" value={newItem.unit_price} onChange={e => onNewItemChange({ ...newItem, unit_price: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </div>
+            <div className="flex items-end gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={newItem.is_taxable} onChange={e => onNewItemChange({ ...newItem, is_taxable: e.target.checked })} className="rounded" />
+                Taxable
+              </label>
+              <div className="flex gap-2 ml-auto">
+                <button onClick={onAddItem} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium">Add</button>
+                <button onClick={onCloseAddForm} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {items.length === 0 && !showAddForm ? (
         <p className="text-sm text-gray-500 py-4">No {title.toLowerCase()} items{selectedCategoryId ? ' in this category' : ''} yet.</p>
-      ) : (
+      ) : items.length > 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -667,7 +703,7 @@ function ItemSection({ title, items, categories, selectedCategoryId, ...props }:
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

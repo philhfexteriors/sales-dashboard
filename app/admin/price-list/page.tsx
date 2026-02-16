@@ -83,6 +83,9 @@ export default function ProductCatalogAdmin() {
     notes: '',
     category_id: null as string | null,
   })
+  // Initial variants to create with a new item: { [group]: string[] }
+  const [newItemVariants, setNewItemVariants] = useState<Record<string, string[]>>({})
+  const [variantInput, setVariantInput] = useState<Record<string, string>>({})
 
   // Add category form
   const [showAddCategory, setShowAddCategory] = useState(false)
@@ -244,9 +247,29 @@ export default function ProductCatalogAdmin() {
         }),
       })
       if (res.ok) {
-        toast.success('Item added')
+        const createdItem = await res.json()
+        // Create initial variants if any were added
+        const allVariantEntries = Object.entries(newItemVariants)
+        for (const [group, names] of allVariantEntries) {
+          for (let i = 0; i < names.length; i++) {
+            await fetch('/api/price-list/variants', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                price_list_id: createdItem.id,
+                name: names[i],
+                variant_group: group,
+                sort_order: i,
+              }),
+            })
+          }
+        }
+        const variantCount = allVariantEntries.reduce((sum, [, names]) => sum + names.length, 0)
+        toast.success(`Item added${variantCount > 0 ? ` with ${variantCount} variant${variantCount > 1 ? 's' : ''}` : ''}`)
         setAddingToSection(null)
         setNewItem({ brand: '', description: '', unit: 'EA', unit_price: 0, is_taxable: false, notes: '', category_id: null })
+        setNewItemVariants({})
+        setVariantInput({})
         fetchItems()
       } else {
         const err = await res.json()
@@ -258,11 +281,15 @@ export default function ProductCatalogAdmin() {
   function openAddForm(section: 'materials' | 'labor') {
     setAddingToSection(section)
     setNewItem({ brand: '', description: '', unit: 'EA', unit_price: 0, is_taxable: false, notes: '', category_id: null })
+    setNewItemVariants({})
+    setVariantInput({})
   }
 
   function closeAddForm() {
     setAddingToSection(null)
     setNewItem({ brand: '', description: '', unit: 'EA', unit_price: 0, is_taxable: false, notes: '', category_id: null })
+    setNewItemVariants({})
+    setVariantInput({})
   }
 
   // --- Variant actions ---
@@ -541,6 +568,10 @@ export default function ProductCatalogAdmin() {
                   newItem={newItem}
                   onNewItemChange={setNewItem}
                   onAddItem={addItem}
+                  newItemVariants={newItemVariants}
+                  onNewItemVariantsChange={setNewItemVariants}
+                  variantInput={variantInput}
+                  onVariantInputChange={setVariantInput}
                 />
                 <ItemSection
                   title="Labor"
@@ -570,6 +601,10 @@ export default function ProductCatalogAdmin() {
                   newItem={newItem}
                   onNewItemChange={setNewItem}
                   onAddItem={addItem}
+                  newItemVariants={newItemVariants}
+                  onNewItemVariantsChange={setNewItemVariants}
+                  variantInput={variantInput}
+                  onVariantInputChange={setVariantInput}
                 />
               </div>
             </div>
@@ -618,9 +653,31 @@ interface ItemSectionProps {
   newItem: NewItemData
   onNewItemChange: (data: NewItemData) => void
   onAddItem: () => void
+  newItemVariants: Record<string, string[]>
+  onNewItemVariantsChange: (v: Record<string, string[]>) => void
+  variantInput: Record<string, string>
+  onVariantInputChange: (v: Record<string, string>) => void
 }
 
-function ItemSection({ title, sectionKey, items, categories, selectedCategoryId, showAddForm, onOpenAddForm, onCloseAddForm, newItem, onNewItemChange, onAddItem, ...props }: ItemSectionProps) {
+function ItemSection({ title, sectionKey, items, categories, selectedCategoryId, showAddForm, onOpenAddForm, onCloseAddForm, newItem, onNewItemChange, onAddItem, newItemVariants, onNewItemVariantsChange, variantInput, onVariantInputChange, ...props }: ItemSectionProps) {
+  // Get variant groups for the selected category
+  const selectedCategory = newItem.category_id ? categories.find(c => c.id === newItem.category_id) : null
+  const variantGroups = selectedCategory?.variant_groups ?? []
+
+  function addVariantChip(group: string) {
+    const val = (variantInput[group] || '').trim()
+    if (!val) return
+    const existing = newItemVariants[group] || []
+    if (existing.includes(val)) return
+    onNewItemVariantsChange({ ...newItemVariants, [group]: [...existing, val] })
+    onVariantInputChange({ ...variantInput, [group]: '' })
+  }
+
+  function removeVariantChip(group: string, name: string) {
+    const existing = newItemVariants[group] || []
+    onNewItemVariantsChange({ ...newItemVariants, [group]: existing.filter(n => n !== name) })
+  }
+
   return (
     <div>
       <h2 className="text-lg font-semibold text-gray-900 mb-3">{title}</h2>
@@ -683,16 +740,52 @@ function ItemSection({ title, sectionKey, items, categories, selectedCategoryId,
               <label className="block text-xs font-medium text-gray-500 mb-1">Unit Price</label>
               <input type="number" step="0.01" value={newItem.unit_price} onChange={e => onNewItemChange({ ...newItem, unit_price: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
             </div>
-            <div className="flex items-end gap-3">
+            <div className="flex items-end">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={newItem.is_taxable} onChange={e => onNewItemChange({ ...newItem, is_taxable: e.target.checked })} className="rounded" />
                 Taxable
               </label>
-              <div className="flex gap-2 ml-auto">
-                <button onClick={onAddItem} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium">Add</button>
-                <button onClick={onCloseAddForm} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button>
-              </div>
             </div>
+          </div>
+
+          {/* Variant inputs — shown when category has variant groups */}
+          {variantGroups.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-gray-200">
+              {variantGroups.map(group => {
+                const chips = newItemVariants[group] || []
+                const input = variantInput[group] || ''
+                return (
+                  <div key={group} className="mb-3 last:mb-0">
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5 capitalize">{group}s</label>
+                    {chips.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {chips.map(name => (
+                          <span key={name} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-white border border-gray-200 text-gray-700">
+                            {name}
+                            <button type="button" onClick={() => removeVariantChip(group, name)} className="text-gray-400 hover:text-red-500 ml-0.5">×</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <input
+                        value={input}
+                        onChange={e => onVariantInputChange({ ...variantInput, [group]: e.target.value })}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addVariantChip(group) } }}
+                        placeholder={`Type a ${group} and press Enter...`}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm flex-1 max-w-sm focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                      <button type="button" onClick={() => addVariantChip(group)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-100">Add</button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="flex gap-2 mt-4 pt-3 border-t border-gray-200">
+            <button onClick={onAddItem} className="px-5 py-2 bg-primary text-white rounded-lg text-sm font-medium">Add Item</button>
+            <button onClick={onCloseAddForm} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button>
           </div>
         </div>
       ) : (

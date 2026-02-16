@@ -164,6 +164,7 @@ export interface ParsedGutterData {
 
 // Helper to parse Hover measurements into usable window data
 export function parseHoverWindows(data: HoverMeasurements): ParsedHoverWindow[] {
+  if (!data.openings) return []
   const { windows, window_groups } = data.openings
 
   const windowToGroup = new Map<string, HoverWindowGroup>()
@@ -241,6 +242,7 @@ export function parseHoverWindows(data: HoverMeasurements): ParsedHoverWindow[] 
 // Parse facade data grouped by material type
 export function parseFacadeData(data: HoverMeasurements): ParsedFacadeData[] {
   const results: ParsedFacadeData[] = []
+  if (!data.facades) return results
 
   for (const [materialType, facades] of Object.entries(data.facades)) {
     let totalArea = 0

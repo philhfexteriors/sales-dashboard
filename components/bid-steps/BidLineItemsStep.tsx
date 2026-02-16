@@ -17,6 +17,7 @@ export default function BidLineItemsStep() {
   const [showCatalog, setShowCatalog] = useState(false)
   const [showMeasurements, setShowMeasurements] = useState(false)
   const [reapplying, setReapplying] = useState(false)
+  const [confirmReapply, setConfirmReapply] = useState(false)
   const [templateData, setTemplateData] = useState<TemplateData | null>(null)
 
   // Recalculate totals when line items change
@@ -58,9 +59,10 @@ export default function BidLineItemsStep() {
     return templateData?.waste_pct ?? 10
   }
 
-  function handleReapplyTemplate() {
-    if (!templateData || !confirm('This will replace all line items with template-calculated quantities. Continue?')) return
+  function executeReapplyTemplate() {
+    if (!templateData) return
     setReapplying(true)
+    setConfirmReapply(false)
     try {
       const wastePct = getWastePct()
       const result = applyTemplate(
@@ -100,13 +102,32 @@ export default function BidLineItemsStep() {
       {(hasTemplate || hasMeasurements) && (
         <div className="flex items-center gap-4 flex-wrap">
           {hasTemplate && hasMeasurements && (
-            <button
-              onClick={handleReapplyTemplate}
-              disabled={reapplying}
-              className="text-sm text-purple-600 font-medium hover:text-purple-800 disabled:opacity-50"
-            >
-              {reapplying ? 'Re-calculating...' : '↻ Re-calculate from Template'}
-            </button>
+            confirmReapply ? (
+              <span className="flex items-center gap-2">
+                <span className="text-sm text-amber-600">Replace all line items?</span>
+                <button
+                  onClick={executeReapplyTemplate}
+                  disabled={reapplying}
+                  className="text-sm text-red-600 font-medium hover:text-red-800 disabled:opacity-50"
+                >
+                  {reapplying ? 'Re-calculating...' : 'Yes, replace'}
+                </button>
+                <button
+                  onClick={() => setConfirmReapply(false)}
+                  className="text-sm text-gray-500 font-medium hover:text-gray-700"
+                >
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setConfirmReapply(true)}
+                disabled={reapplying}
+                className="text-sm text-purple-600 font-medium hover:text-purple-800 disabled:opacity-50"
+              >
+                {reapplying ? 'Re-calculating...' : '↻ Re-calculate from Template'}
+              </button>
+            )
           )}
           {hasMeasurements && tradeVars.length > 0 && (
             <button

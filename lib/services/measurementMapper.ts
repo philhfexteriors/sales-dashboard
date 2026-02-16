@@ -45,23 +45,24 @@ export interface WasteCalcInputs {
  * it can and defaults the rest to 0.
  */
 export function extractWasteCalcInputs(measurements: HoverMeasurements): WasteCalcInputs {
-  // Parse facade data
-  const facadeData = parseFacadeData(measurements)
+  // Parse facade data (with null guard)
+  const facadeData = measurements.facades ? parseFacadeData(measurements) : []
   const totalFacadeArea = facadeData.reduce((sum, f) => sum + f.totalArea, 0)
-  const totalOpenings = facadeData.reduce((sum, f) => sum + f.totalOpenings, 0)
 
-  // Estimate opening perimeter from window/door data
+  // Estimate opening perimeter from window/door data (with null guards)
   let openingsPerimeter = 0
-  for (const w of measurements.openings.windows) {
-    const sizeMatch = w.width_x_height.match(/(\d+)"\s*x\s*(\d+)"/)
+  const windows = measurements.openings?.windows || []
+  const doors = measurements.openings?.doors || []
+  for (const w of windows) {
+    const sizeMatch = w.width_x_height?.match(/(\d+)"\s*x\s*(\d+)"/)
     if (sizeMatch) {
       const width = parseInt(sizeMatch[1])
       const height = parseInt(sizeMatch[2])
       openingsPerimeter += 2 * (width + height) / 12 // convert inches to feet
     }
   }
-  for (const d of measurements.openings.doors) {
-    const sizeMatch = d.width_x_height.match(/(\d+)"\s*x\s*(\d+)"/)
+  for (const d of doors) {
+    const sizeMatch = d.width_x_height?.match(/(\d+)"\s*x\s*(\d+)"/)
     if (sizeMatch) {
       const width = parseInt(sizeMatch[1])
       const height = parseInt(sizeMatch[2])

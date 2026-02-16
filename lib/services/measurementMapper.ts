@@ -109,6 +109,19 @@ export function extractWasteCalcInputs(measurements: HoverMeasurements): WasteCa
  * Extract roof measurements from Hover data.
  * Hover's full_json may include roof-level summary data.
  */
+/**
+ * Safely extract a numeric value from Hover data.
+ * Hover may return numbers, strings, objects, or nested structures.
+ */
+function toNum(val: unknown): number {
+  if (typeof val === 'number' && isFinite(val)) return val
+  if (typeof val === 'string') {
+    const parsed = parseFloat(val)
+    return isFinite(parsed) ? parsed : 0
+  }
+  return 0
+}
+
 function extractRoofData(measurements: HoverMeasurements): {
   area: number
   ridges: number
@@ -120,14 +133,14 @@ function extractRoofData(measurements: HoverMeasurements): {
   // Hover sometimes includes roof data in the summary or as a top-level key
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const roof = (measurements as any).roof || (measurements as any).roof_summary
-  if (roof) {
+  if (roof && typeof roof === 'object') {
     return {
-      area: roof.total_area || roof.area || 0,
-      ridges: roof.ridges || roof.ridge_length || 0,
-      hips: roof.hips || roof.hip_length || 0,
-      valleys: roof.valleys || roof.valley_length || 0,
-      rakes: roof.rakes || roof.rake_length || 0,
-      eaves: roof.eaves || roof.eave_length || 0,
+      area: toNum(roof.total_area) || toNum(roof.area),
+      ridges: toNum(roof.ridges) || toNum(roof.ridge_length),
+      hips: toNum(roof.hips) || toNum(roof.hip_length),
+      valleys: toNum(roof.valleys) || toNum(roof.valley_length),
+      rakes: toNum(roof.rakes) || toNum(roof.rake_length),
+      eaves: toNum(roof.eaves) || toNum(roof.eave_length),
     }
   }
 

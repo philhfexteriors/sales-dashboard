@@ -198,31 +198,38 @@ export function validateFormula(formula: string): {
  * Convert WasteCalcInputs to a flat Record<string, number> for use in FormulaContext.
  */
 export function buildMeasurementContext(inputs: WasteCalcInputs): Record<string, number> {
+  // Safely coerce all values to numbers — Hover data can sometimes
+  // contain objects or strings where we expect numbers
+  function n(val: unknown): number {
+    if (typeof val === 'number' && isFinite(val)) return val
+    if (typeof val === 'string') { const p = parseFloat(val); return isFinite(p) ? p : 0 }
+    return 0
+  }
   return {
-    area: inputs.area,
-    ridges: inputs.ridges,
-    hips: inputs.hips,
-    valleys: inputs.valleys,
-    rakes: inputs.rakes,
-    eaves: inputs.eaves,
-    flashing: inputs.flashing,
-    stepFlashing: inputs.stepFlashing,
-    ridgeVentLength: inputs.ridgeVentLength,
-    sidingArea: inputs.sidingArea,
-    outsideCorners: inputs.outsideCorners,
-    insideCorners: inputs.insideCorners,
-    openingsPerimeter: inputs.openingsPerimeter,
-    slopedTrim: inputs.slopedTrim,
-    verticalTrim: inputs.verticalTrim,
-    levelFrieze: inputs.levelFrieze,
-    slopedFrieze: inputs.slopedFrieze,
-    levelStarter: inputs.levelStarter,
-    openingsSills: inputs.openingsSills,
-    soffitSf: inputs.soffitSf,
-    gutterDownCount: inputs.gutterDownCount,
-    openingsTop: inputs.openingsTop,
-    blockCount: inputs.blockCount,
-    porchSoffit: inputs.porchSoffit,
+    area: n(inputs.area),
+    ridges: n(inputs.ridges),
+    hips: n(inputs.hips),
+    valleys: n(inputs.valleys),
+    rakes: n(inputs.rakes),
+    eaves: n(inputs.eaves),
+    flashing: n(inputs.flashing),
+    stepFlashing: n(inputs.stepFlashing),
+    ridgeVentLength: n(inputs.ridgeVentLength),
+    sidingArea: n(inputs.sidingArea),
+    outsideCorners: n(inputs.outsideCorners),
+    insideCorners: n(inputs.insideCorners),
+    openingsPerimeter: n(inputs.openingsPerimeter),
+    slopedTrim: n(inputs.slopedTrim),
+    verticalTrim: n(inputs.verticalTrim),
+    levelFrieze: n(inputs.levelFrieze),
+    slopedFrieze: n(inputs.slopedFrieze),
+    levelStarter: n(inputs.levelStarter),
+    openingsSills: n(inputs.openingsSills),
+    soffitSf: n(inputs.soffitSf),
+    gutterDownCount: n(inputs.gutterDownCount),
+    openingsTop: n(inputs.openingsTop),
+    blockCount: n(inputs.blockCount),
+    porchSoffit: n(inputs.porchSoffit),
   }
 }
 

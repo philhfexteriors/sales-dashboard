@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import AppShell from '@/components/AppShell'
 import { BidFormProvider, useBidForm } from '@/components/BidFormProvider'
 import StepNavigation from '@/components/StepNavigation'
@@ -35,7 +36,9 @@ export default function EditBid({ params }: { params: Promise<{ id: string }> })
 
 function BidEditor() {
   const { loading, saving, dirty, saveNow } = useBidForm()
-  const [currentStep, setCurrentStep] = useState(0)
+  const searchParams = useSearchParams()
+  const initialStep = searchParams.get('hover') === 'connected' ? 2 : 0
+  const [currentStep, setCurrentStep] = useState(initialStep)
 
   if (loading) {
     return <div className="py-20"><Loading message="Loading bid..." size="lg" /></div>

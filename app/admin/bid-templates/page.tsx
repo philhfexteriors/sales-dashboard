@@ -455,13 +455,13 @@ function TemplateCard({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-left">
-                    <th className="px-3 py-2 font-medium text-gray-500 w-24">Section</th>
-                    <th className="px-3 py-2 font-medium text-gray-500">Description</th>
-                    <th className="px-3 py-2 font-medium text-gray-500 w-16">Unit</th>
-                    <th className="px-3 py-2 font-medium text-gray-500">Formula</th>
-                    <th className="px-3 py-2 font-medium text-gray-500 w-20">Def Qty</th>
+                    <th className="px-3 py-2 font-medium text-gray-500 w-28">Section</th>
+                    <th className="px-3 py-2 font-medium text-gray-500 min-w-[180px]">Description</th>
+                    <th className="px-3 py-2 font-medium text-gray-500 w-20">Unit</th>
+                    <th className="px-3 py-2 font-medium text-gray-500 min-w-[200px]">Formula</th>
+                    <th className="px-3 py-2 font-medium text-gray-500 w-24">Fallback Qty</th>
                     <th className="px-3 py-2 font-medium text-gray-500 w-36">Depends On</th>
-                    <th className="px-3 py-2 font-medium text-gray-500 w-44">Price List</th>
+                    <th className="px-3 py-2 font-medium text-gray-500 w-32">Price List</th>
                     <th className="px-3 py-2 w-10"></th>
                   </tr>
                 </thead>
@@ -559,7 +559,7 @@ function TemplateItemRow({
         <select
           value={item.section}
           onChange={e => onUpdate({ section: e.target.value })}
-          className="w-full px-1 py-1 border border-gray-200 rounded text-xs"
+          className="w-full px-2 py-1 border border-gray-200 rounded text-sm"
         >
           <option value="materials">Materials</option>
           <option value="labor">Labor</option>
@@ -581,7 +581,7 @@ function TemplateItemRow({
         <select
           value={item.unit}
           onChange={e => onUpdate({ unit: e.target.value })}
-          className="w-full px-1 py-1 border border-gray-200 rounded text-xs"
+          className="w-full px-2 py-1 border border-gray-200 rounded text-sm"
         >
           {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
         </select>
@@ -611,7 +611,7 @@ function TemplateItemRow({
         </div>
       </td>
 
-      {/* Default Qty */}
+      {/* Fallback Qty (used when no formula) */}
       <td className="px-3 py-2">
         <input
           type="number"
@@ -619,7 +619,7 @@ function TemplateItemRow({
           value={item.default_qty ?? ''}
           onChange={e => onUpdate({ default_qty: e.target.value ? parseFloat(e.target.value) : null })}
           className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-right"
-          placeholder="\u2014"
+          placeholder="—"
         />
       </td>
 

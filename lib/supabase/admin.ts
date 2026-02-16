@@ -12,7 +12,12 @@ export function getSupabaseAdmin(): SupabaseClient {
     if (!supabaseUrl || !supabaseServiceRoleKey) {
       throw new Error('Supabase server credentials not configured')
     }
-    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey)
+    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
   }
   return _supabaseAdmin
 }

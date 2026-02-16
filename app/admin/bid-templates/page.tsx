@@ -850,11 +850,29 @@ function AddTemplateItemPicker({
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const ref = useRef<HTMLDivElement>(null)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Position the dropdown when opening
+  const toggleOpen = () => {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      // Open upward from button, capped to viewport
+      const maxHeight = Math.min(420, rect.top - 8)
+      const top = rect.top - maxHeight
+      setDropdownPos({ top, left: rect.left, width: Math.min(384, window.innerWidth - rect.left - 16) })
+    }
+    setOpen(!open)
+    if (open) setSearch('')
+  }
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+        buttonRef.current && !buttonRef.current.contains(e.target as Node)
+      ) {
         setOpen(false)
         setSearch('')
       }
@@ -877,16 +895,26 @@ function AddTemplateItemPicker({
   const labor = filtered.filter(i => i.section === 'labor')
 
   return (
-    <div className="px-4 py-3 border-t border-gray-100 relative" ref={ref}>
+    <div className="px-4 py-3 border-t border-gray-100">
       <button
-        onClick={() => setOpen(!open)}
+        ref={buttonRef}
+        onClick={toggleOpen}
         className="text-sm text-primary font-medium hover:text-primary-dark"
       >
         + Add Item from Catalog
       </button>
 
-      {open && (
-        <div className="absolute z-50 bottom-full mb-1 left-4 right-4 sm:right-auto sm:w-96 bg-white rounded-xl border border-gray-200 shadow-xl overflow-hidden max-h-[min(420px,50vh)] flex flex-col">
+      {open && dropdownPos && ReactDOM.createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-[9999] bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden flex flex-col"
+          style={{
+            top: dropdownPos.top,
+            left: dropdownPos.left,
+            width: dropdownPos.width,
+            maxHeight: buttonRef.current ? buttonRef.current.getBoundingClientRect().top - 8 : 420,
+          }}
+        >
           {/* Search */}
           <div className="p-3 border-b border-gray-100 shrink-0">
             <input
@@ -971,7 +999,8 @@ function AddTemplateItemPicker({
               + Add custom item (not in catalog)
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

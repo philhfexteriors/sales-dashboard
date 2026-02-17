@@ -1,7 +1,7 @@
 import type { HoverMeasurements } from './hoverTypes'
 import type { BidLineItem } from '@/components/BidFormProvider'
 import { calculateLineItemTotals } from '@/components/BidFormProvider'
-import { extractWasteCalcInputs } from './measurementMapper'
+import { extractWasteCalcInputs, extractWasteCalcInputsFromConfig, type MappingConfig } from './measurementMapper'
 import { evaluateFormula, buildMeasurementContext, type FormulaContext } from './formulaEvaluator'
 
 // ---------- Types ----------
@@ -100,10 +100,13 @@ function topologicalSort(items: TemplateItemData[]): TemplateItemData[] {
 export function applyTemplate(
   template: TemplateData,
   measurements: HoverMeasurements | null,
-  config: TemplateApplicationConfig
+  config: TemplateApplicationConfig,
+  mappings?: MappingConfig[] | null
 ): BidLineItem[] {
-  // Step 1: Build measurement context
-  const wasteCalcInputs = measurements ? extractWasteCalcInputs(measurements) : null
+  // Step 1: Build measurement context (use config-driven extraction if mappings provided)
+  const wasteCalcInputs = measurements
+    ? (mappings?.length ? extractWasteCalcInputsFromConfig(measurements, mappings) : extractWasteCalcInputs(measurements))
+    : null
 
   const measurementValues: Record<string, number> = wasteCalcInputs
     ? buildMeasurementContext(wasteCalcInputs)

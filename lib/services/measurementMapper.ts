@@ -33,6 +33,193 @@ export interface WasteCalcInputs {
   porchSoffit: number        // porch soffit area in SQ/FT
 }
 
+// ---------- Mapping Config Types ----------
+
+export interface MappingConfig {
+  id: string
+  target_field: string
+  target_label: string
+  target_unit: string
+  trade_group: string
+  mapping_type: 'direct' | 'computed' | 'derived' | 'manual'
+  hover_json_paths: string | null
+  computation_id: string | null
+  derived_formula: string | null
+  default_value: number
+  hover_source_category: string
+  hover_source_description: string | null
+  sort_order: number
+}
+
+// ---------- Default Mappings (used for DB seeding & reset) ----------
+
+export const DEFAULT_MAPPINGS: Omit<MappingConfig, 'id'>[] = [
+  // Roof
+  { target_field: 'area', target_label: 'Roof Area', target_unit: 'sq ft', trade_group: 'roof', mapping_type: 'direct', hover_json_paths: 'roof.area.total|roof.area.facets_total|roof.total_area', computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'roof', hover_source_description: 'Total roof area', sort_order: 0 },
+  { target_field: 'ridges', target_label: 'Ridges', target_unit: 'LF', trade_group: 'roof', mapping_type: 'direct', hover_json_paths: 'roof.measurements.ridges|roof.ridges|roof.ridge_length', computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'roof', hover_source_description: 'Ridge length', sort_order: 1 },
+  { target_field: 'hips', target_label: 'Hips', target_unit: 'LF', trade_group: 'roof', mapping_type: 'direct', hover_json_paths: 'roof.measurements.hips|roof.hips|roof.hip_length', computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'roof', hover_source_description: 'Hip length', sort_order: 2 },
+  { target_field: 'valleys', target_label: 'Valleys', target_unit: 'LF', trade_group: 'roof', mapping_type: 'direct', hover_json_paths: 'roof.measurements.valleys|roof.valleys|roof.valley_length', computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'roof', hover_source_description: 'Valley length', sort_order: 3 },
+  { target_field: 'rakes', target_label: 'Rakes', target_unit: 'LF', trade_group: 'roof', mapping_type: 'direct', hover_json_paths: 'roof.measurements.rakes|roof.rakes|roof.rake_length', computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'roof', hover_source_description: 'Rake length', sort_order: 4 },
+  { target_field: 'eaves', target_label: 'Eaves', target_unit: 'LF', trade_group: 'roof', mapping_type: 'direct', hover_json_paths: 'roof.measurements.eaves|roof.measurements.gutters_eaves|roof.eaves|roof.gutters_eaves|roof.eave_length', computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'roof', hover_source_description: 'Eave / gutter run length', sort_order: 5 },
+  { target_field: 'flashing', target_label: 'Flashing', target_unit: 'LF', trade_group: 'roof', mapping_type: 'direct', hover_json_paths: 'roof.measurements.flashing', computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'roof', hover_source_description: 'Flashing length', sort_order: 6 },
+  { target_field: 'stepFlashing', target_label: 'Step Flashing', target_unit: 'LF', trade_group: 'roof', mapping_type: 'direct', hover_json_paths: 'roof.measurements.step_flashing', computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'roof', hover_source_description: 'Step flashing length', sort_order: 7 },
+  { target_field: 'ridgeVentLength', target_label: 'Ridge Vent Length', target_unit: 'LF', trade_group: 'roof', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Manual entry only', sort_order: 8 },
+  // Siding
+  { target_field: 'sidingArea', target_label: 'Siding Area', target_unit: 'sq ft', trade_group: 'siding', mapping_type: 'computed', hover_json_paths: null, computation_id: 'sum_facade_areas', derived_formula: null, default_value: 0, hover_source_category: 'facades', hover_source_description: 'Sum of all facade areas', sort_order: 0 },
+  { target_field: 'outsideCorners', target_label: 'Outside Corners', target_unit: 'count', trade_group: 'siding', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Manual entry — requires 3D model', sort_order: 1 },
+  { target_field: 'insideCorners', target_label: 'Inside Corners', target_unit: 'count', trade_group: 'siding', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Manual entry — requires 3D model', sort_order: 2 },
+  { target_field: 'openingsPerimeter', target_label: 'Openings Perimeter', target_unit: 'LF', trade_group: 'siding', mapping_type: 'computed', hover_json_paths: null, computation_id: 'calc_openings_perimeter', derived_formula: null, default_value: 0, hover_source_category: 'openings', hover_source_description: 'Calculated from window/door dimensions', sort_order: 3 },
+  { target_field: 'slopedTrim', target_label: 'Sloped Trim', target_unit: 'LF', trade_group: 'siding', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Manual entry only', sort_order: 4 },
+  { target_field: 'verticalTrim', target_label: 'Vertical Trim', target_unit: 'LF', trade_group: 'siding', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Manual entry only', sort_order: 5 },
+  { target_field: 'levelFrieze', target_label: 'Level Frieze', target_unit: 'LF', trade_group: 'siding', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Manual entry only', sort_order: 6 },
+  { target_field: 'slopedFrieze', target_label: 'Sloped Frieze', target_unit: 'LF', trade_group: 'siding', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Manual entry only', sort_order: 7 },
+  { target_field: 'levelStarter', target_label: 'Level Starter', target_unit: 'LF', trade_group: 'siding', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Manual entry only', sort_order: 8 },
+  { target_field: 'openingsSills', target_label: 'Openings Sills', target_unit: 'LF', trade_group: 'siding', mapping_type: 'derived', hover_json_paths: null, computation_id: null, derived_formula: '{openingsPerimeter} / 4', default_value: 0, hover_source_category: 'openings', hover_source_description: 'Estimated as openingsPerimeter / 4', sort_order: 9 },
+  { target_field: 'soffitSf', target_label: 'Soffit SF', target_unit: 'sq ft', trade_group: 'siding', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Manual entry only', sort_order: 10 },
+  { target_field: 'gutterDownCount', target_label: 'Gutter Down Count', target_unit: 'count', trade_group: 'siding', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Manual entry only', sort_order: 11 },
+  { target_field: 'openingsTop', target_label: 'Openings Top', target_unit: 'LF', trade_group: 'siding', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Hardie only — manual entry', sort_order: 12 },
+  { target_field: 'blockCount', target_label: 'Block Count', target_unit: 'count', trade_group: 'siding', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Hardie only — manual entry', sort_order: 13 },
+  { target_field: 'porchSoffit', target_label: 'Porch Soffit', target_unit: 'sq ft', trade_group: 'siding', mapping_type: 'manual', hover_json_paths: null, computation_id: null, derived_formula: null, default_value: 0, hover_source_category: 'none', hover_source_description: 'Manual entry only', sort_order: 14 },
+]
+
+// ---------- Computation Registry ----------
+
+const COMPUTATION_REGISTRY: Record<string, (measurements: HoverMeasurements) => number> = {
+  sum_facade_areas: (m) => {
+    const facadeData = m.facades ? parseFacadeData(m) : []
+    return facadeData.reduce((sum, f) => sum + f.totalArea, 0)
+  },
+  calc_openings_perimeter: (m) => {
+    let perimeter = 0
+    const windows = m.openings?.windows || []
+    const doors = m.openings?.doors || []
+    for (const w of windows) {
+      const sizeMatch = w.width_x_height?.match(/(\d+)"\s*x\s*(\d+)"/)
+      if (sizeMatch) {
+        perimeter += 2 * (parseInt(sizeMatch[1]) + parseInt(sizeMatch[2])) / 12
+      }
+    }
+    for (const d of doors) {
+      const sizeMatch = d.width_x_height?.match(/(\d+)"\s*x\s*(\d+)"/)
+      if (sizeMatch) {
+        perimeter += 2 * (parseInt(sizeMatch[1]) + parseInt(sizeMatch[2])) / 12
+      }
+    }
+    return perimeter
+  },
+}
+
+export const AVAILABLE_COMPUTATIONS: { id: string; label: string; description: string }[] = [
+  { id: 'sum_facade_areas', label: 'Sum Facade Areas', description: 'Sums area from all facade entries' },
+  { id: 'calc_openings_perimeter', label: 'Calc Openings Perimeter', description: 'Calculates perimeter from all window/door dimensions' },
+]
+
+// ---------- JSON Path Resolver ----------
+
+function resolveJsonPath(obj: unknown, path: string): unknown {
+  const parts = path.split('.')
+  let current: unknown = obj
+  for (const part of parts) {
+    if (current === null || current === undefined || typeof current !== 'object') return undefined
+    current = (current as Record<string, unknown>)[part]
+  }
+  return current
+}
+
+function resolveDirectMapping(measurements: HoverMeasurements, pathsStr: string): number {
+  const paths = pathsStr.split('|')
+  for (const path of paths) {
+    const val = toNum(resolveJsonPath(measurements, path.trim()))
+    if (val !== 0) return val
+  }
+  return 0
+}
+
+// ---------- Config-Driven Extraction ----------
+
+/**
+ * Extract waste calc inputs using database-stored mapping configuration.
+ * Falls back to default_value for any field where Hover data is unavailable.
+ */
+export function extractWasteCalcInputsFromConfig(
+  measurements: HoverMeasurements,
+  mappings: MappingConfig[]
+): WasteCalcInputs {
+  const resolved: Record<string, number> = {}
+
+  // Phase 1: Resolve direct and computed mappings
+  for (const mapping of mappings) {
+    if (mapping.mapping_type === 'direct' && mapping.hover_json_paths) {
+      resolved[mapping.target_field] = resolveDirectMapping(measurements, mapping.hover_json_paths)
+    } else if (mapping.mapping_type === 'computed' && mapping.computation_id) {
+      const fn = COMPUTATION_REGISTRY[mapping.computation_id]
+      resolved[mapping.target_field] = fn ? fn(measurements) : mapping.default_value
+    } else if (mapping.mapping_type === 'manual') {
+      resolved[mapping.target_field] = mapping.default_value
+    }
+    // Skip 'derived' for now — resolved in phase 2
+  }
+
+  // Phase 2: Resolve derived mappings (reference other resolved fields)
+  for (const mapping of mappings) {
+    if (mapping.mapping_type === 'derived' && mapping.derived_formula) {
+      const expression = mapping.derived_formula.replace(/\{([^}]+)\}/g, (_match, token: string) => {
+        const val = resolved[token.trim()]
+        return val !== undefined ? String(val) : '0'
+      })
+      try {
+        const cleaned = expression.replace(/\s+/g, '')
+        if (/^[0-9.+\-*/()]+$/.test(cleaned)) {
+          // eslint-disable-next-line no-new-func
+          const result = new Function(`return (${cleaned})`)()
+          resolved[mapping.target_field] = typeof result === 'number' && isFinite(result) ? result : mapping.default_value
+        } else {
+          resolved[mapping.target_field] = mapping.default_value
+        }
+      } catch {
+        resolved[mapping.target_field] = mapping.default_value
+      }
+    }
+  }
+
+  // Apply defaults for any missing fields
+  for (const mapping of mappings) {
+    if (resolved[mapping.target_field] === undefined) {
+      resolved[mapping.target_field] = mapping.default_value
+    }
+  }
+
+  return {
+    area: resolved.area ?? 0,
+    ridges: resolved.ridges ?? 0,
+    hips: resolved.hips ?? 0,
+    valleys: resolved.valleys ?? 0,
+    rakes: resolved.rakes ?? 0,
+    eaves: resolved.eaves ?? 0,
+    flashing: resolved.flashing ?? 0,
+    stepFlashing: resolved.stepFlashing ?? 0,
+    ridgeVentLength: resolved.ridgeVentLength ?? 0,
+    steepAreas: {},
+    sidingArea: resolved.sidingArea ?? 0,
+    outsideCorners: resolved.outsideCorners ?? 0,
+    insideCorners: resolved.insideCorners ?? 0,
+    openingsPerimeter: resolved.openingsPerimeter ?? 0,
+    slopedTrim: resolved.slopedTrim ?? 0,
+    verticalTrim: resolved.verticalTrim ?? 0,
+    levelFrieze: resolved.levelFrieze ?? 0,
+    slopedFrieze: resolved.slopedFrieze ?? 0,
+    levelStarter: resolved.levelStarter ?? 0,
+    openingsSills: resolved.openingsSills ?? 0,
+    soffitSf: resolved.soffitSf ?? 0,
+    gutterDownCount: resolved.gutterDownCount ?? 0,
+    openingsTop: resolved.openingsTop ?? 0,
+    blockCount: resolved.blockCount ?? 0,
+    porchSoffit: resolved.porchSoffit ?? 0,
+  }
+}
+
+// ---------- Original Hardcoded Extraction (kept as fallback) ----------
+
 /**
  * Extract waste calculator input variables from Hover measurement data.
  * Maps Hover's JSON structure to our flat input format for the waste calculator.
@@ -110,10 +297,6 @@ export function extractWasteCalcInputs(measurements: HoverMeasurements): WasteCa
 }
 
 /**
- * Extract roof measurements from Hover data.
- * Hover's full_json may include roof-level summary data.
- */
-/**
  * Safely extract a numeric value from Hover data.
  * Hover may return numbers, strings, objects, or nested structures.
  */
@@ -142,14 +325,6 @@ function extractRoofData(measurements: HoverMeasurements): {
     return { area: 0, ridges: 0, hips: 0, valleys: 0, rakes: 0, eaves: 0 }
   }
 
-  // Hover full_json structure has:
-  //   roof.area.total         -> total roof area in sq ft
-  //   roof.measurements.*     -> linear footage values
-  //   roof.measurements.ridges, .hips, .valleys, .rakes, .gutters_eaves, .flashing, .step_flashing
-  //
-  // But some Hover versions or summarized_json may have flat:
-  //   roof.total_area or roof.ridges directly
-
   // Area: try roof.area.total first (full_json), then flat keys
   let area = 0
   if (roof.area && typeof roof.area === 'object' && roof.area !== null) {
@@ -174,4 +349,3 @@ function extractRoofData(measurements: HoverMeasurements): {
 
   return { area, ridges, hips, valleys, rakes, eaves }
 }
-

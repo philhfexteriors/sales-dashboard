@@ -35,6 +35,7 @@ export default function Navigation() {
     { href: '/admin/price-list', label: 'Product Catalog', icon: BoxIcon },
     { href: '/admin/products', label: 'Plan Fields (Legacy)', icon: BoxIcon },
     { href: '/admin/bid-templates', label: 'Bid Templates', icon: TemplateIcon },
+    { href: '/admin/hover-mappings', label: 'Hover Mappings', icon: MappingIcon },
     { href: '/admin/tax-rates', label: 'Tax Rates', icon: PriceIcon },
     { href: '/admin/start-dates', label: 'Start Dates', icon: CalendarIcon },
     { href: '/admin/payment-notes', label: 'Payment Notes', icon: NoteIcon },
@@ -267,6 +268,14 @@ function TemplateIcon() {
   return (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" />
+    </svg>
+  )
+}
+
+function MappingIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
     </svg>
   )
 }

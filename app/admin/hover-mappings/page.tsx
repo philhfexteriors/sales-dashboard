@@ -18,9 +18,13 @@ const TRADE_LABELS: Record<string, string> = {
 }
 
 const SOURCE_LABELS: Record<string, string> = {
-  roof: 'Roof Measurements',
-  facades: 'Facade Data',
-  openings: 'Openings (Windows / Doors)',
+  roof: 'Roof',
+  area: 'Area Summary',
+  openings: 'Openings',
+  trim: 'Trim',
+  roofline: 'Roofline / Soffit',
+  corners: 'Corners',
+  facades: 'Facades (old format)',
 }
 
 const TYPE_COLORS: Record<string, { dot: string; line: string; label: string }> = {
@@ -179,7 +183,7 @@ export default function HoverMappingsPage() {
 
   // ---------- Grouping ----------
 
-  const sourceCategories = ['roof', 'facades', 'openings'] as const
+  const sourceCategories = ['roof', 'area', 'openings', 'trim', 'roofline', 'corners', 'facades'] as const
   const tradeGroups = Object.keys(TRADE_LABELS)
 
   const mappingsByTrade = tradeGroups.reduce((acc, trade) => {
@@ -270,27 +274,67 @@ export default function HoverMappingsPage() {
                   <div className="space-y-1">
                     {cat === 'roof' && (
                       <>
-                        <SourcePath path="roof.area.total" />
-                        <SourcePath path="roof.measurements.ridges" />
-                        <SourcePath path="roof.measurements.hips" />
-                        <SourcePath path="roof.measurements.valleys" />
-                        <SourcePath path="roof.measurements.rakes" />
-                        <SourcePath path="roof.measurements.gutters_eaves" />
-                        <SourcePath path="roof.measurements.flashing" />
-                        <SourcePath path="roof.measurements.step_flashing" />
+                        <SourcePath path="roof.roof_facets.area" />
+                        <SourcePath path="roof.ridges_hips.length" />
+                        <SourcePath path="roof.valleys.length" />
+                        <SourcePath path="roof.rakes.length" />
+                        <SourcePath path="roof.gutters_eaves.length" />
+                        <SourcePath path="roof.flashing.length" />
+                        <SourcePath path="roof.step_flashing.length" />
+                        <SourcePath path="roof.pitch[*]" label="roof.pitch (pitch/area %)" />
+                        <SourcePath path="roof.waste_factor.area.*" label="roof.waste_factor.area" />
                       </>
                     )}
-                    {cat === 'facades' && (
+                    {cat === 'area' && (
                       <>
-                        <SourcePath path="facades[*].area" label="sum(facades[*].area)" />
-                        <SourcePath path="facades[*].openings" label="facade openings count" />
+                        <SourcePath path="area.facades.siding" />
+                        <SourcePath path="area.facades.other" />
+                        <SourcePath path="area.openings.siding" />
+                        <SourcePath path="area.total.siding" />
+                        <SourcePath path="siding_waste.*" label="siding_waste (precomputed)" />
                       </>
                     )}
                     {cat === 'openings' && (
                       <>
-                        <SourcePath path="openings.windows[*]" label="windows dimensions" />
-                        <SourcePath path="openings.doors[*]" label="doors dimensions" />
-                        <SourcePath path="openings.window_groups[*]" label="window groups" />
+                        <SourcePath path="openings.quantity.siding" />
+                        <SourcePath path="openings.tops_length.siding" />
+                        <SourcePath path="openings.sills_length.siding" />
+                        <SourcePath path="openings.sides_length.siding" />
+                        <SourcePath path="openings.total_perimeter.siding" />
+                      </>
+                    )}
+                    {cat === 'trim' && (
+                      <>
+                        <SourcePath path="trim.level_starter.siding" />
+                        <SourcePath path="trim.sloped_trim.siding" />
+                        <SourcePath path="trim.vertical_trim.siding" />
+                        <SourcePath path="transitions.level_transitions.siding" label="transitions.level_transitions" />
+                        <SourcePath path="transitions.sloped_transitions.siding" label="transitions.sloped_transitions" />
+                      </>
+                    )}
+                    {cat === 'roofline' && (
+                      <>
+                        <SourcePath path="roofline.eaves_fascia.length" />
+                        <SourcePath path="roofline.rakes_fascia.length" />
+                        <SourcePath path="roofline.level_frieze_board.length" />
+                        <SourcePath path="roofline.level_frieze_board.soffit_area" />
+                        <SourcePath path="roofline.sloped_frieze_board.length" />
+                        <SourcePath path="roofline.sloped_frieze_board.soffit_area" />
+                      </>
+                    )}
+                    {cat === 'corners' && (
+                      <>
+                        <SourcePath path="corners.outside_corners_qty.siding" />
+                        <SourcePath path="corners.outside_corners_len.siding" />
+                        <SourcePath path="corners.inside_corners_qty.siding" />
+                        <SourcePath path="corners.inside_corners_len.siding" />
+                      </>
+                    )}
+                    {cat === 'facades' && (
+                      <>
+                        <SourcePath path="facades[*].area" label="facades[*].area (old format)" />
+                        <SourcePath path="accessories.shutter_qty.siding" />
+                        <SourcePath path="accessories.vents_qty.siding" />
                       </>
                     )}
                   </div>
@@ -558,8 +602,12 @@ function MappingEditor({
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="roof">Roof</option>
-            <option value="facades">Facades</option>
+            <option value="area">Area Summary</option>
             <option value="openings">Openings</option>
+            <option value="trim">Trim</option>
+            <option value="roofline">Roofline / Soffit</option>
+            <option value="corners">Corners</option>
+            <option value="facades">Facades (old format)</option>
             <option value="none">None</option>
           </select>
         </div>
@@ -591,8 +639,12 @@ function MappingEditor({
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="roof">Roof</option>
-            <option value="facades">Facades</option>
+            <option value="area">Area Summary</option>
             <option value="openings">Openings</option>
+            <option value="trim">Trim</option>
+            <option value="roofline">Roofline / Soffit</option>
+            <option value="corners">Corners</option>
+            <option value="facades">Facades (old format)</option>
             <option value="none">None</option>
           </select>
         </div>
@@ -635,8 +687,12 @@ function MappingEditor({
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           >
             <option value="roof">Roof</option>
-            <option value="facades">Facades</option>
+            <option value="area">Area Summary</option>
             <option value="openings">Openings</option>
+            <option value="trim">Trim</option>
+            <option value="roofline">Roofline / Soffit</option>
+            <option value="corners">Corners</option>
+            <option value="facades">Facades (old format)</option>
             <option value="none">None</option>
           </select>
         </div>
@@ -705,30 +761,46 @@ function TradeIcon({ trade }: { trade: string }) {
 function getCommonPaths(tradeGroup: string): string[] {
   const paths: Record<string, string[]> = {
     roof: [
-      'roof.area.total',
-      'roof.total_area',
-      'roof.measurements.ridges',
-      'roof.measurements.hips',
-      'roof.measurements.valleys',
-      'roof.measurements.rakes',
-      'roof.measurements.gutters_eaves',
-      'roof.measurements.flashing',
-      'roof.measurements.step_flashing',
+      'roof.roof_facets.area',
+      'roof.ridges_hips.length',
+      'roof.valleys.length',
+      'roof.rakes.length',
+      'roof.gutters_eaves.length',
+      'roof.flashing.length',
+      'roof.step_flashing.length',
+      'roofline.eaves_fascia.length',
+      'roofline.rakes_fascia.length',
     ],
     siding: [
-      'facades.vinyl_siding',
-      'facades.fiber_cement',
-      'facades.wood',
-      'facades.brick',
-      'facades.stucco',
+      'area.facades.siding',
+      'area.total.siding',
+      'corners.outside_corners_qty.siding',
+      'corners.inside_corners_qty.siding',
+      'corners.outside_corners_len.siding',
+      'corners.inside_corners_len.siding',
+      'openings.total_perimeter.siding',
+      'openings.tops_length.siding',
+      'openings.sills_length.siding',
+      'openings.sides_length.siding',
+      'openings.quantity.siding',
+      'trim.level_starter.siding',
+      'trim.sloped_trim.siding',
+      'trim.vertical_trim.siding',
+      'roofline.level_frieze_board.length',
+      'roofline.sloped_frieze_board.length',
+      'roofline.level_frieze_board.soffit_area',
+      'roofline.sloped_frieze_board.soffit_area',
+      'transitions.level_transitions.siding',
     ],
     gutters: [
-      'roof.measurements.gutters_eaves',
-      'roof.measurements.eaves',
+      'roof.gutters_eaves.length',
+      'roofline.eaves_fascia.length',
     ],
     fascia_soffit: [
-      'roof.measurements.rakes',
-      'roof.measurements.eaves',
+      'roofline.eaves_fascia.length',
+      'roofline.rakes_fascia.length',
+      'roofline.level_frieze_board.soffit_area',
+      'roofline.sloped_frieze_board.soffit_area',
     ],
   }
   return paths[tradeGroup] || []
